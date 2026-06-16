@@ -51,6 +51,9 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+playwright-report/
+test-results/
+frontend/e2e/
 
 # Documentation files
 *.md
