@@ -66,7 +66,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
 
     setQuoteError("");
     try {
-      const createdByName = user?.FullName || user?.Username || "Unknown";
+      const createdByName = localStorage.getItem("createdBy") || "Unknown";
       const payload = {
         ItemID: item.ItemID,
         VendorID: vendorId,
