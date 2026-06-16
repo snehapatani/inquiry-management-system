@@ -63,6 +63,8 @@ export const getInquiry    = (id) => req(`/inquiries/${id}`);
 export const createInquiry = (data) => req("/inquiries", { method: "POST", body: JSON.stringify(data) });
 export const updateInquiryStatus = (id, status) =>
   req(`/inquiries/${id}/status?status=${encodeURIComponent(status)}`, { method: "PATCH" });
+export const deleteInquiry = (id) =>
+  req(`/delete-inquiry`, { method: "POST", body: JSON.stringify({ inquiry_id: id }) });
 
 // Items
 export const matchVendors  = (itemId) => req(`/items/${itemId}/match-vendors`);
@@ -86,6 +88,7 @@ export const createVendorProduct  = (data) => req("/vendor-products", { method: 
 export const deleteVendorProduct  = (id) => req(`/vendor-products/${id}`, { method: "DELETE" });
 
 // Quotes
+export const getAllQuotes = () => req("/quotes");
 export const getQuotes    = (itemId) => req(`/items/${itemId}/quotes`);
 export const createQuote  = (data) => req("/quotes", { method: "POST", body: JSON.stringify(data) });
 export const updateQuote  = (id, data) => req(`/quotes/${id}`, { method: "PUT", body: JSON.stringify(data) });

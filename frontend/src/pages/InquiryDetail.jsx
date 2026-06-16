@@ -142,15 +142,20 @@ export default function InquiryDetail({ id, onBack, user = null }) {
     lines.push("");
     Items.forEach(item => {
       const itemQuotes = quotes[item.ItemID] || [];
+      // Get best price: first try marked as best, then most recent, then any quote
       const best = itemQuotes.find(q => q.IsBestPrice) || itemQuotes[0];
-      if (best) {
-        lines.push(`• ${item.ProductNameNorm || item.ProductNameRaw} — ${item.Quantity} ${item.Unit || ""}`);
-        lines.push(`  Price: ${best.Currency} ${best.QuotedPrice} ${best.PriceUnit || ""}  |  Lead Time: ${best.LeadTimeDays || "—"} days`);
-        lines.push("");
+
+      lines.push(`• ${item.ProductNameNorm || item.ProductNameRaw} — ${item.Quantity} ${item.Unit || ""}`);
+
+      if (best && best.QuotedPrice) {
+        lines.push(`  Price: ${best.Currency || "INR"} ${best.QuotedPrice}${best.PriceUnit ? " / " + best.PriceUnit : ""}  |  Lead Time: ${best.LeadTimeDays || "—"} days${best.Notes ? " | " + best.Notes : ""}`);
+      } else if (itemQuotes.length > 0) {
+        // If quote exists but no price, still show vendor info
+        lines.push(`  Quote received from: ${itemQuotes[0].VendorName || "Vendor"}  |  Awaiting final confirmation`);
       } else {
-        lines.push(`• ${item.ProductNameNorm || item.ProductNameRaw} — Quote pending`);
-        lines.push("");
+        lines.push(`  Quote: Pending`);
       }
+      lines.push("");
     });
     lines.push("Regards,\nInquiry MS Team");
     setResponseText(lines.join("\n"));
@@ -229,7 +234,7 @@ export default function InquiryDetail({ id, onBack, user = null }) {
             <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
               <button onClick={handleSendResponse} disabled={sending || !responseText.trim()}
                 style={{ flex: 1, background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
-                {sending ? "Saving…" : "Log Response as Sent"}
+                {sending ? "Sending…" : "Send Response"}
               </button>
               <button onClick={() => setShowResponse(false)}
                 style={{ flex: 1, background: "#eee", color: "#333", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontSize: 14 }}>

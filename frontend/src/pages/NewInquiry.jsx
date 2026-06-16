@@ -1,4 +1,6 @@
 import { useState } from "react";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
 import { parseInquiry, createCustomer, createInquiry } from "../api";
 
 const SOURCES = ["WhatsApp", "Email", "Phone", "Other"];
@@ -16,11 +18,26 @@ const inputStyle = (err) => ({
 });
 
 export default function NewInquiry({ onSaved }) {
+  function formatDateDisplay(dateStr) {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  function formatDateStorage(displayStr) {
+    if (!displayStr) return "";
+    const parts = displayStr.split('/');
+    if (parts.length !== 3) return "";
+    const [day, month, year] = parts;
+    if (day.length !== 2 || month.length !== 2 || year.length !== 4) return "";
+    return `${year}-${month}-${day}`;
+  }
+
   const [rawText, setRawText]   = useState("");
   const [source, setSource]     = useState("WhatsApp");
   const [inquiryDate, setInquiryDate] = useState(() => {
     const today = new Date().toISOString().split('T')[0];
-    return localStorage.getItem("inquiryDate") || today;
+    return formatDateDisplay(today);
   });
   const [parsed, setParsed]     = useState(null);
   const [parsing, setParsing]   = useState(false);
@@ -30,6 +47,7 @@ export default function NewInquiry({ onSaved }) {
   const [saveErrors, setSaveErrors] = useState([]);
   const [touched, setTouched]   = useState({});
   const [createdBy, setCreatedBy] = useState(() => localStorage.getItem("createdBy") || "");
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const textErr    = touched.rawText   && !rawText.trim();
   const createdErr = touched.createdBy && !createdBy.trim();
@@ -105,6 +123,7 @@ export default function NewInquiry({ onSaved }) {
     setSaveErrors([]);
     setError("");
     try {
+      const inquiryDateFormatted = formatDateStorage(inquiryDate);
       const customer = await createCustomer({
         Name: parsed.customer_name || "Unknown",
         Company: parsed.customer_company,
@@ -112,12 +131,12 @@ export default function NewInquiry({ onSaved }) {
         Phone: parsed.customer_phone,
         SourceChannel: source,
         CustomerCategory: parsed.customer_category || "Not Identified",
-        InquiryDate: inquiryDate ? new Date(inquiryDate).toISOString() : null,
+        InquiryDate: inquiryDateFormatted || null,
       });
       await createInquiry({
         CustomerID: customer.CustomerID,
         Source: source,
-        InquiryDate: inquiryDate ? new Date(inquiryDate).toISOString() : null,
+        InquiryDate: inquiryDateFormatted || null,
         RawText: rawText,
         CreatedBy: createdBy || null,
         Items: parsed.items
@@ -229,8 +248,30 @@ export default function NewInquiry({ onSaved }) {
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#555" }}>Inquiry Date</label>
-                <input type="date" value={inquiryDate} onChange={e => { setInquiryDate(e.target.value); localStorage.setItem("inquiryDate", e.target.value); }}
-                  style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box", border: "1px solid #ccc" }} />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    placeholder="DD/MM/YYYY"
+                    value={inquiryDate}
+                    onClick={() => setShowCalendar(!showCalendar)}
+                    readOnly
+                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box", border: "1px solid #ccc", cursor: "pointer", background: "#fafafa" }} />
+                  {showCalendar && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 1000, background: "white", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+                      <Calendar
+                        value={inquiryDate ? new Date(formatDateStorage(inquiryDate).split('-')[0], parseInt(formatDateStorage(inquiryDate).split('-')[1]) - 1, formatDateStorage(inquiryDate).split('-')[2]) : new Date()}
+                        onChange={(date) => {
+                          const displayValue = formatDateDisplay(date.toISOString().split('T')[0]);
+                          setInquiryDate(displayValue);
+                          const storageValue = formatDateStorage(displayValue);
+                          if (storageValue) localStorage.setItem("inquiryDate", storageValue);
+                          setShowCalendar(false);
+                        }}
+                        maxDate={new Date()}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

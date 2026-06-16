@@ -1,6 +1,8 @@
 import { matchVendors, createQuote, setBestQuote, getQuotes, createVendor, getVendors } from "../api";
 import { formatDate } from "../utils";
 import { useState } from "react";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
 
 export default function ProductDetailCard({ item, quotes: initialQuotes = [], vendors = [], user = null, mode = "detail", onRemove, onAddToQueue, isSelected }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -10,6 +12,22 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
   const [newQuote, setNewQuote] = useState({});
   const [quoteError, setQuoteError] = useState("");
   const [vendorsOpen, setVendorsOpen] = useState(false);
+  const [showCalendarByItem, setShowCalendarByItem] = useState({});
+
+  function formatDateDisplay(dateStr) {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  function formatDateStorage(displayStr) {
+    if (!displayStr) return "";
+    const parts = displayStr.split('/');
+    if (parts.length !== 3) return "";
+    const [day, month, year] = parts;
+    if (day.length !== 2 || month.length !== 2 || year.length !== 4) return "";
+    return `${year}-${month}-${day}`;
+  }
 
   async function handleMatch() {
     try {
@@ -83,7 +101,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
   const form = newQuote || {};
 
   return (
-    <div key={item.ItemID} style={{ background: mode === "detail" ? "#fff" : "transparent", borderRadius: mode === "detail" ? 10 : 0, boxShadow: mode === "detail" ? "0 1px 4px rgba(0,0,0,0.1)" : "none", marginBottom: mode === "detail" ? 10 : 0, overflow: "hidden", borderBottom: mode === "queue" ? "1px solid #eef0f5" : "none" }}>
+    <div key={item.ItemID} style={{ background: mode === "detail" ? "#fff" : "transparent", borderRadius: mode === "detail" ? 10 : 0, boxShadow: mode === "detail" ? "0 1px 4px rgba(0,0,0,0.1)" : "none", marginBottom: mode === "detail" ? 10 : 0, overflow: "visible", borderBottom: mode === "queue" ? "1px solid #eef0f5" : "none" }}>
 
       {/* Product Header */}
       <div onClick={() => setIsExpanded(!isExpanded)}
@@ -226,10 +244,31 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
                     style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
                 </div>
               ))}
-              <div>
+              <div style={{ position: "relative", zIndex: 50 }}>
                 <label style={{ fontSize: 11, color: "#666" }}>Quote Date</label>
-                <input type="date" value={form["QuotedDate"] || ""} onChange={e => updateNewQuote("QuotedDate", e.target.value)}
-                  style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    placeholder="DD/MM/YYYY"
+                    value={form["QuotedDate"] ? formatDateDisplay(form["QuotedDate"]) : formatDateDisplay(new Date().toISOString().split('T')[0])}
+                    onClick={() => setShowCalendarByItem(c => ({ ...c, [item.ItemID]: !c[item.ItemID] }))}
+                    readOnly
+                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box", cursor: "pointer", background: "#fafafa" }} />
+                  {showCalendarByItem[item.ItemID] && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 9999, background: "white", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+                      <Calendar
+                        value={form["QuotedDate"] ? new Date(form["QuotedDate"]) : new Date()}
+                        onChange={(date) => {
+                          const displayValue = formatDateDisplay(date.toISOString().split('T')[0]);
+                          const storageValue = formatDateStorage(displayValue);
+                          updateNewQuote("QuotedDate", storageValue);
+                          setShowCalendarByItem(c => ({ ...c, [item.ItemID]: false }));
+                        }}
+                        maxDate={new Date()}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
               <button onClick={handleAddQuote}
                 disabled={!form._vendorName?.trim() || !form.QuotedPrice}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getInquiries, getQuotes, getResponses } from "../api";
+import { getInquiries, getQuotes, getResponses, getInquiry, getAllQuotes, getAllResponses } from "../api";
 import { formatDate } from "../utils";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -22,9 +22,10 @@ export default function Analytics() {
   const [filterCreatedBy, setFilterCreatedBy] = useState("");
 
   const [inquiries, setInquiries] = useState([]);
-  const [quotes, setQuotes] = useState([]);
   const [responses, setResponses] = useState([]);
   const [createdByList, setCreatedByList] = useState([]);
+  const [quotedProductCount, setQuotedProductCount] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchAnalyticsData(); }, [timePeriod, customStartDate, customEndDate, filterStatus, filterCreatedBy]);
@@ -34,15 +35,21 @@ export default function Analytics() {
     try {
       const [inquiriesData, quotesData, responsesData] = await Promise.all([
         getInquiries({}),
-        getQuotes ? getQuotes(null).catch(() => []) : Promise.resolve([]),
-        getResponses ? getResponses(null).catch(() => []) : Promise.resolve([]),
+        getAllQuotes().catch(() => []),
+        getAllResponses().catch(() => []),
       ]);
 
-      // Filter by date range
+      // Filter by date range (compare just the date part, ignoring timezone)
       const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
       const filteredInquiries = inquiriesData.filter(inq => {
-        const inqDate = new Date(inq.ReceivedDate);
-        return inqDate >= startDate && inqDate <= endDate;
+        // Use InquiryDate if available, fall back to ReceivedDate
+        const dateStr = inq.InquiryDate || inq.ReceivedDate;
+        const inqDate = new Date(dateStr);
+        // Extract just the date part (YYYY-MM-DD) and compare
+        const inqDateStr = inqDate.toISOString().split('T')[0];
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        return inqDateStr >= startDateStr && inqDateStr <= endDateStr;
       });
 
       // Apply additional filters
@@ -55,8 +62,30 @@ export default function Analytics() {
       }
 
       setInquiries(finalInquiries);
-      setQuotes(quotesData || []);
-      setResponses(responsesData || []);
+
+      // Filter responses for the final inquiries
+      const finalInquiryIds = new Set(finalInquiries.map(i => i.InquiryID));
+      const filteredResponses = (responsesData || []).filter(r => finalInquiryIds.has(r.InquiryID));
+      setResponses(filteredResponses);
+
+      // Fetch full inquiries to get items count and item IDs
+      let totalProductsCount = 0;
+      const allItemIds = new Set();
+      try {
+        const fullInquiriesPromises = finalInquiries.map(inq => getInquiry(inq.InquiryID).catch(() => ({ Items: [] })));
+        const fullInquiries = await Promise.all(fullInquiriesPromises);
+        fullInquiries.forEach(inq => {
+          totalProductsCount += inq.Items?.length || 0;
+          (inq.Items || []).forEach(item => allItemIds.add(item.ItemID));
+        });
+      } catch (error) {
+        console.error("Error fetching full inquiries for product count:", error);
+      }
+      setTotalProducts(totalProductsCount);
+
+      // Count quoted products (items with best quotes from ALL filtered inquiries)
+      const quotedCount = new Set(quotesData.filter(q => allItemIds.has(q.ItemID) && q.IsBestPrice).map(q => q.ItemID)).size;
+      setQuotedProductCount(quotedCount);
 
       // Extract unique CreatedBy values
       const uniqueCreatedBy = [...new Set(inquiriesData.map(inq => inq.CreatedBy).filter(Boolean))];
@@ -104,14 +133,7 @@ export default function Analytics() {
   };
 
   const totalInquiries = inquiries.length;
-  const totalQuotes = quotes.length;
-  const totalResponses = responses.length;
-  const responseRate = totalInquiries > 0 ? Math.round((statusCounts.Quoted + statusCounts.Closed) / totalInquiries * 100) : 0;
-
-  // Count products that have been quoted (from inquiries with Quoted or Closed status)
-  const quotedProducts = inquiries
-    .filter(inq => inq.Status === "Quoted" || inq.Status === "Closed")
-    .reduce((count, inq) => count + (inq.ItemCount || 0), 0);
+  const responseSent = responses.length;
 
   // Generate chart data
   function getInquiriesByDateData() {
@@ -161,8 +183,8 @@ export default function Analytics() {
       padding: 20,
       boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
       border: `3px solid ${color}`,
-      flex: "1 1 calc(25% - 12px)",
-      minWidth: 200,
+      flex: "1 1 auto",
+      minWidth: 0,
     }}>
       <div style={{ fontSize: 12, color: "#888", marginBottom: 8, fontWeight: 500 }}>{label}</div>
       <div style={{ fontSize: 32, fontWeight: 700, color: color, marginBottom: 6 }}>{value}</div>
@@ -240,11 +262,11 @@ export default function Analytics() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "nowrap" }}>
             <KPICard label="Total Inquiries" value={totalInquiries} color="#003366" />
-            <KPICard label="Total Quotes" value={totalQuotes} color="#1a7a4a" />
-            <KPICard label="Products Quoted" value={quotedProducts} color="#1a56db" />
-            <KPICard label="Response Rate" value={`${responseRate}%`} color="#d97706" />
+            <KPICard label="Total Products" value={totalProducts} color="#1a7a4a" />
+            <KPICard label="Products Quoted" value={quotedProductCount} color="#1a56db" />
+            <KPICard label="Response Sent" value={responseSent} color="#d97706" />
           </div>
 
           {/* Status Breakdown */}
@@ -274,49 +296,6 @@ export default function Analytics() {
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Summary Table */}
-          <div style={{
-            background: "#fff",
-            borderRadius: 10,
-            padding: 20,
-            marginBottom: 20,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-          }}>
-            <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: 16 }}>Summary</h3>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Total Inquiries</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#003366" }}>{totalInquiries}</td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Total Quotes</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#1a7a4a" }}>{totalQuotes}</td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Products Quoted</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#1a56db" }}>{quotedProducts}</td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Inquiries in Progress</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#ff9800" }}>{statusCounts["In Progress"]}</td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Inquiries Quoted</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#1a7a4a" }}>{statusCounts.Quoted}</td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Inquiries Closed</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#4b5563" }}>{statusCounts.Closed}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: "12px 0", fontWeight: 600, color: "#555" }}>Response Rate</td>
-                  <td style={{ padding: "12px 0", textAlign: "right", fontSize: 18, fontWeight: 700, color: "#d97706" }}>{responseRate}%</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
 
           {/* Charts Section */}

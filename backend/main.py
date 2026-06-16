@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, APIRouter
+from fastapi import FastAPI, Depends, HTTPException, APIRouter, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func, and_, or_
 from typing import List, Optional
@@ -7,6 +8,10 @@ import models, schemas
 from database import engine, get_db, Base
 from parser import parse_inquiry, normalize_product_name
 from auth import get_current_user, require_admin, hash_password, verify_password, create_access_token
+
+# Request models
+class DeleteInquiryRequest(BaseModel):
+    inquiry_id: int
 
 Base.metadata.create_all(bind=engine)
 
@@ -257,7 +262,6 @@ def update_inquiry_status(inquiry_id: int, status: str, db: Session = Depends(ge
     db.commit()
     return {"ok": True}
 
-
 # ── Protected: InquiryItems ───────────────────────────────────
 @priv.patch("/items/{item_id}/toggle-select")
 def toggle_select(item_id: int, db: Session = Depends(get_db)):
@@ -496,6 +500,10 @@ def match_vendors(item_id: int, db: Session = Depends(get_db)):
 
 
 # ── Protected: VendorQuotes ───────────────────────────────────
+@priv.get("/quotes", response_model=List[schemas.VendorQuoteOut])
+def get_all_quotes(db: Session = Depends(get_db)):
+    return db.query(models.VendorQuote).all()
+
 @priv.get("/items/{item_id}/quotes", response_model=List[schemas.VendorQuoteOut])
 def get_quotes(item_id: int, db: Session = Depends(get_db)):
     return db.query(models.VendorQuote).filter(models.VendorQuote.ItemID == item_id).all()
@@ -558,3 +566,20 @@ def get_all_responses(db: Session = Depends(get_db)):
 
 # Register protected router
 app.include_router(priv)
+
+# Delete inquiry endpoint
+@app.post("/delete-inquiry")
+def delete_inquiry_endpoint(req: DeleteInquiryRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    inquiry_id = req.inquiry_id
+    inq = db.query(models.Inquiry).filter(models.Inquiry.InquiryID == inquiry_id).first()
+    if not inq:
+        raise HTTPException(404, "Inquiry not found")
+    db.query(models.SentResponse).filter(models.SentResponse.InquiryID == inquiry_id).delete(synchronize_session=False)
+    items = db.query(models.InquiryItem.ItemID).filter(models.InquiryItem.InquiryID == inquiry_id).all()
+    item_ids = [item[0] for item in items]
+    if item_ids:
+        db.query(models.VendorQuote).filter(models.VendorQuote.ItemID.in_(item_ids)).delete(synchronize_session=False)
+    db.query(models.InquiryItem).filter(models.InquiryItem.InquiryID == inquiry_id).delete(synchronize_session=False)
+    db.delete(inq)
+    db.commit()
+    return {"ok": True}

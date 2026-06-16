@@ -52,6 +52,26 @@ yarn-error.log*
 coverage/
 .nyc_output/
 
+# Documentation files
+*.md
+!README.md
+
+# Excel/Spreadsheet files
+*.xlsx
+*.xls
+*.csv
+
+# Word documents
+*.docx
+*.doc
+
+# Temporary/generated files
+~$*
+*.tmp
+recordings/
+.claude/
+schema.sql
+
 # Misc
 .cache/
 temp/

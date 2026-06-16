@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getInquiries, bulkSelectItems } from "../api";
+import { getInquiries, bulkSelectItems, deleteInquiry } from "../api";
 import { formatDate } from "../utils";
 
 const STATUS_COLORS = {
@@ -15,11 +15,13 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
   const [customerSearch, setCustomerSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [createdBySearch, setCreatedBySearch] = useState("");
-  const [sortBy, setSortBy] = useState("ReceivedDate");
+  const [sortBy, setSortBy] = useState("InquiryDate");
   const [sortDir, setSortDir] = useState("desc");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set()); // set of InquiryIDs
   const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState(null); // InquiryID being deleted
+  const [modal, setModal] = useState(null); // { type: 'confirm'|'error'|'success', inquiryId?, message? }
 
   const productFilterActive = Boolean(productSearch);
 
@@ -124,6 +126,25 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
     if (onGoToWorkQueue) onGoToWorkQueue();
   }
 
+  function handleDeleteClick(inquiryId) {
+    setModal({ type: "confirm", inquiryId });
+  }
+
+  async function confirmDelete(inquiryId) {
+    setModal(null);
+    setDeleting(inquiryId);
+    try {
+      await deleteInquiry(inquiryId);
+      setInquiries(inquiries.filter(inq => inq.InquiryID !== inquiryId));
+      setModal({ type: "success", message: "Inquiry deleted successfully" });
+      setTimeout(() => setModal(null), 2000);
+    } catch (error) {
+      setModal({ type: "error", message: `Failed to delete inquiry: ${error.message}` });
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   const allSelected = inquiries.length > 0 && selected.size === inquiries.length;
   const someSelected = selected.size > 0;
   const totalMatchingItems = inquiries
@@ -132,7 +153,7 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
 
   const sortableColumns = {
     "#": "InquiryID",
-    "Date": "ReceivedDate",
+    "Date": "InquiryDate",
     "Customer": "CustomerName",
     "Source": "Source",
     "Created By": "CreatedBy",
@@ -202,7 +223,7 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
           Search
         </button>
         {(customerSearch || productSearch || createdBySearch) && (
-          <button onClick={() => { setCustomerSearch(""); setProductSearch(""); setCreatedBySearch(""); setSortBy("ReceivedDate"); setSortDir("desc"); fetchInquiries(filter, "", "", "", "ReceivedDate", "desc"); }}
+          <button onClick={() => { setCustomerSearch(""); setProductSearch(""); setCreatedBySearch(""); setSortBy("InquiryDate"); setSortDir("desc"); fetchInquiries(filter, "", "", "", "InquiryDate", "desc"); }}
             style={{ background: "#eee", color: "#555", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 13 }}>
             Clear
           </button>
@@ -263,7 +284,7 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
                     </td>
                   )}
                   <td style={{ padding: "10px 14px", fontSize: 13, color: "#888" }}>#{inq.InquiryID}</td>
-                  <td style={{ padding: "10px 14px", fontSize: 13 }}>{formatDate(inq.ReceivedDate)}</td>
+                  <td style={{ padding: "10px 14px", fontSize: 13 }}>{formatDate(inq.InquiryDate || inq.ReceivedDate)}</td>
                   <td style={{ padding: "10px 14px" }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{inq.CustomerName || "—"}</div>
                     <div style={{ fontSize: 12, color: "#666" }}>{inq.CustomerCompany || ""}</div>
@@ -285,10 +306,14 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
                       {inq.Status}
                     </span>
                   </td>
-                  <td style={{ padding: "10px 14px" }}>
+                  <td style={{ padding: "10px 14px", display: "flex", gap: 6 }}>
                     <button onClick={() => onOpen(inq.InquiryID)}
                       style={{ background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 12 }}>
                       Open
+                    </button>
+                    <button onClick={() => handleDeleteClick(inq.InquiryID)} disabled={deleting === inq.InquiryID}
+                      style={{ background: deleting === inq.InquiryID ? "#ccc" : "#d32f2f", color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", cursor: deleting === inq.InquiryID ? "not-allowed" : "pointer", fontSize: 12 }}>
+                      {deleting === inq.InquiryID ? "Deleting…" : "Delete"}
                     </button>
                   </td>
                 </tr>
@@ -296,6 +321,67 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
             })}
           </tbody>
         </table>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {modal?.type === "confirm" && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setModal(null)}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: "#d32f2f", fontSize: 18 }}>Delete Inquiry?</h3>
+              <button onClick={() => setModal(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
+            </div>
+            <p style={{ margin: "0 0 24px", color: "#555", lineHeight: 1.5 }}>
+              Are you sure you want to delete this inquiry? This action cannot be undone. All related items and quotes will also be deleted.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => confirmDelete(modal.inquiryId)}
+                style={{ flex: 1, background: "#d32f2f", color: "#fff", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                Delete Inquiry
+              </button>
+              <button onClick={() => setModal(null)}
+                style={{ flex: 1, background: "#eee", color: "#333", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontSize: 14 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {modal?.type === "error" && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setModal(null)}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, color: "#d32f2f", fontSize: 18 }}>Error</h3>
+              <button onClick={() => setModal(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
+            </div>
+            <p style={{ margin: "0 0 24px", color: "#555", lineHeight: 1.5 }}>
+              {modal.message}
+            </p>
+            <button onClick={() => setModal(null)}
+              style={{ width: "100%", background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {modal?.type === "success" && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+            <h3 style={{ margin: "0 0 8px", color: "#1a7a4a", fontSize: 18 }}>Success</h3>
+            <p style={{ margin: 0, color: "#555", fontSize: 14 }}>
+              {modal.message}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
