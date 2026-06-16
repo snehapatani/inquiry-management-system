@@ -109,6 +109,7 @@ export default function WorkQueue({ onOpenInquiry, user = null }) {
 
     setQuoteError(e => ({ ...e, [itemId]: "" }));
     try {
+      const createdByName = user?.FullName || user?.Username || localStorage.getItem("createdBy") || "Unknown";
       const payload = {
         ItemID: itemId,
         VendorID: vendorId,
@@ -117,7 +118,7 @@ export default function WorkQueue({ onOpenInquiry, user = null }) {
         LeadTimeDays: form.LeadTimeDays ? Number(form.LeadTimeDays) : null,
         QuotedDate: form.QuotedDate || null,
         Notes: form.Notes || null,
-        CreatedBy: form.CreatedBy || null,
+        CreatedBy: createdByName,
       };
       await createQuote(payload);
       const updated = await getQuotes(itemId);
