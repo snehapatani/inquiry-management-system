@@ -109,7 +109,7 @@ export default function WorkQueue({ onOpenInquiry, user = null }) {
 
     setQuoteError(e => ({ ...e, [itemId]: "" }));
     try {
-      const createdByName = user?.FullName || user?.Username || localStorage.getItem("createdBy") || "Unknown";
+      const createdByName = localStorage.getItem("createdBy") || "Unknown";
       const payload = {
         ItemID: itemId,
         VendorID: vendorId,
