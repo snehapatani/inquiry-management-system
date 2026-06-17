@@ -83,6 +83,7 @@ export default function InquiryDetail({ id, onBack, user = null }) {
 
     setQuoteError(e => ({ ...e, [itemId]: "" }));
     try {
+      const createdByName = localStorage.getItem("createdBy") || "Unknown";
       const payload = {
         ItemID: itemId,
         VendorID: vendorId,
@@ -91,7 +92,7 @@ export default function InquiryDetail({ id, onBack, user = null }) {
         LeadTimeDays: form.LeadTimeDays ? Number(form.LeadTimeDays) : null,
         QuotedDate: form.QuotedDate || null,
         Notes: form.Notes || null,
-        CreatedBy: form.CreatedBy || null,
+        CreatedBy: createdByName,
       };
       await createQuote(payload);
       const updated = await getQuotes(itemId);
@@ -111,7 +112,8 @@ export default function InquiryDetail({ id, onBack, user = null }) {
 
   async function handleSendResponse() {
     setSending(true);
-    await sendResponse({ InquiryID: id, Channel: "Email", MessageBody: responseText, SentBy: "User" });
+    const sentBy = localStorage.getItem("createdBy") || "User";
+    await sendResponse({ InquiryID: id, Channel: "Email", MessageBody: responseText, SentBy: sentBy });
     setSending(false);
     setResponseText("");
     setShowResponse(false);
