@@ -165,15 +165,33 @@ def list_inquiries(
 ):
     rows = (
         db.query(
-            models.Inquiry,
+            models.Inquiry.InquiryID,
+            models.Inquiry.CustomerID,
+            models.Inquiry.InquiryDate,
+            models.Inquiry.ReceivedDate,
+            models.Inquiry.Source,
+            models.Inquiry.Status,
+            models.Inquiry.Remarks,
+            models.Inquiry.CreatedBy,
             models.Customer.Name.label("CustomerName"),
             models.Customer.Company.label("CustomerCompany"),
             func.count(models.InquiryItem.ItemID).label("ItemCount"),
         )
         .join(models.Customer, models.Inquiry.CustomerID == models.Customer.CustomerID)
         .outerjoin(models.InquiryItem, models.Inquiry.InquiryID == models.InquiryItem.InquiryID)
-        .group_by(models.Inquiry.InquiryID, models.Customer.Name, models.Customer.Company)
-        .order_by(models.Inquiry.ReceivedDate.desc())
+        .group_by(
+            models.Inquiry.InquiryID,
+            models.Inquiry.CustomerID,
+            models.Inquiry.InquiryDate,
+            models.Inquiry.ReceivedDate,
+            models.Inquiry.Source,
+            models.Inquiry.Status,
+            models.Inquiry.Remarks,
+            models.Inquiry.CreatedBy,
+            models.Customer.Name,
+            models.Customer.Company,
+        )
+        .order_by(models.Inquiry.InquiryID.desc())
     )
     if status:
         rows = rows.filter(models.Inquiry.Status == status)
@@ -188,7 +206,7 @@ def list_inquiries(
         )
 
     all_rows = rows.all()
-    inquiry_ids = [inq.InquiryID for inq, _, _, _ in all_rows]
+    inquiry_ids = [row[0] for row in all_rows]
 
     matching_items_map: dict = {}
     if product_name and inquiry_ids:
@@ -207,12 +225,22 @@ def list_inquiries(
             matching_items_map.setdefault(inq_id, []).append(item_id)
 
     result = []
-    for inq, cname, ccompany, item_count in all_rows:
-        out = schemas.InquiryOut.model_validate(inq)
-        out.CustomerName = cname
-        out.CustomerCompany = ccompany
-        out.ItemCount = item_count
-        out.MatchingItemIDs = matching_items_map.get(inq.InquiryID, [])
+    for row in all_rows:
+        out = schemas.InquiryOut(
+            InquiryID=row.InquiryID,
+            CustomerID=row.CustomerID,
+            InquiryDate=row.InquiryDate,
+            ReceivedDate=row.ReceivedDate,
+            Source=row.Source,
+            RawText=None,
+            Status=row.Status,
+            Remarks=row.Remarks,
+            CreatedBy=row.CreatedBy,
+            CustomerName=row.CustomerName,
+            CustomerCompany=row.CustomerCompany,
+            ItemCount=row.ItemCount,
+            MatchingItemIDs=matching_items_map.get(row.InquiryID, []),
+        )
         result.append(out)
     return result
 

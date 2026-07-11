@@ -229,8 +229,6 @@ export default function WorkQueue({ onOpenInquiry, user = null }) {
     setGroups(gs => gs.filter(g => g.InquiryID !== responseModal.InquiryID));
   }
 
-  if (loading) return <p>Loading…</p>;
-
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -242,7 +240,7 @@ export default function WorkQueue({ onOpenInquiry, user = null }) {
 
       {groups.length === 0 ? (
         <div style={{ background: "#fff", borderRadius: 10, padding: 40, textAlign: "center", color: "#888", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
-          No products in the work queue.<br />
+          No items in work queue.<br />
           <span style={{ fontSize: 13 }}>Open an inquiry and click <b>+ Work Queue</b> on any product.</span>
         </div>
       ) : (
