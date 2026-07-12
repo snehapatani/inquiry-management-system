@@ -4,6 +4,7 @@ Falls back to a regex-based mock parser when no API key is configured.
 """
 import re
 import json
+from typing import Optional
 import anthropic
 from database import settings
 from schemas import ParsedInquiry, ParsedItem
@@ -21,7 +22,7 @@ _UNIT_MAP = {
 }
 
 # ── table parser (structured data) ────────────────────────────
-def _parse_table(raw_text: str) -> ParsedInquiry | None:
+def _parse_table(raw_text: str) -> Optional[ParsedInquiry]:
     """Try to parse inquiry if it contains a table (pipe-delimited, CSV, or tab-separated)."""
     lines = [l.rstrip() for l in raw_text.splitlines() if l.strip()]  # Only strip trailing whitespace to preserve leading empty cells
 

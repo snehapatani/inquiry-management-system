@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from pydantic_settings import BaseSettings
 from typing import Optional
+from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
@@ -26,13 +27,23 @@ _use_real_db = (
 )
 
 if _use_real_db:
-    connection_string = (
-        f"mssql+pyodbc://{settings.DB_USER}:{settings.DB_PASSWORD}"
-        f"@{settings.DB_SERVER}/{settings.DB_NAME}"
-        f"?driver={settings.DB_DRIVER.replace(' ', '+')}"
-        f"&Encrypt=yes&TrustServerCertificate=yes"
+    # This safely constructs the connection URL without string injection errors
+    connection_url = URL.create(
+        "mssql+pyodbc",
+        username=settings.DB_USER,      # "sa"
+        password=settings.DB_PASSWORD,  # "Solution_1"
+        host=settings.DB_SERVER,        # "192.168.1.195"
+        port=1433,                      # Hardcoding 1433 keeps it explicit
+        database=settings.DB_NAME,      # "InquiryMIS"
+        query={
+            "driver": settings.DB_DRIVER,  # "ODBC Driver 17 for SQL Server"
+            "Encrypt": "yes",
+            "TrustServerCertificate": "yes"
+        }
     )
-    engine = create_engine(connection_string, echo=False, pool_pre_ping=True)
+
+    # Initialize the engine
+    engine = create_engine(connection_url, echo=False, pool_pre_ping=True)
 else:
     engine = create_engine(
         "sqlite:///./inquiry_ms.db",

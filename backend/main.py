@@ -6,7 +6,7 @@ from sqlalchemy import text, func, and_, or_
 from typing import List, Optional
 import models, schemas
 from database import engine, get_db, Base
-from parser import parse_inquiry, normalize_product_name
+from inquiry_parser import parse_inquiry, normalize_product_name
 from auth import get_current_user, require_admin, hash_password, verify_password, create_access_token
 
 # Request models
@@ -37,7 +37,7 @@ app = FastAPI(title="Inquiry MS API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://192.168.1.195:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
