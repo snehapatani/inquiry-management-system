@@ -26,29 +26,43 @@ _use_real_db = (
     and settings.DB_PASSWORD not in ("your_password", "", None)
 )
 
-if _use_real_db:
-    # This safely constructs the connection URL without string injection errors
-    connection_url = URL.create(
-        "mssql+pyodbc",
-        username=settings.DB_USER,      # "sa"
-        password=settings.DB_PASSWORD,  # "Solution_1"
-        host=settings.DB_SERVER,        # "192.168.1.195"
-        port=1433,                      # Hardcoding 1433 keeps it explicit
-        database=settings.DB_NAME,      # "InquiryMIS"
-        query={
-            "driver": settings.DB_DRIVER,  # "ODBC Driver 17 for SQL Server"
-            "Encrypt": "yes",
-            "TrustServerCertificate": "yes"
-        }
-    )
+def _create_engine():
+    if not _use_real_db:
+        print("⚠️  No database credentials, using SQLite")
+        return create_engine(
+            "sqlite:///./inquiry_ms.db",
+            connect_args={"check_same_thread": False},
+        )
 
-    # Initialize the engine
-    engine = create_engine(connection_url, echo=False, pool_pre_ping=True)
-else:
-    engine = create_engine(
-        "sqlite:///./inquiry_ms.db",
-        connect_args={"check_same_thread": False},
-    )
+    try:
+        connection_url = URL.create(
+            "mssql+pyodbc",
+            username=settings.DB_USER,
+            password=settings.DB_PASSWORD,
+            host=settings.DB_SERVER,
+            port=1433,
+            database=settings.DB_NAME,
+            query={
+                "driver": settings.DB_DRIVER,
+                "Encrypt": "yes",
+                "TrustServerCertificate": "yes"
+            }
+        )
+
+        engine = create_engine(connection_url, echo=False, pool_pre_ping=True)
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        print(f"✅ Connected to SQL Server: {settings.DB_SERVER}")
+        return engine
+    except Exception as e:
+        print(f"⚠️  Cannot reach SQL Server ({settings.DB_SERVER}): {type(e).__name__}")
+        print("📦 Falling back to SQLite")
+        return create_engine(
+            "sqlite:///./inquiry_ms.db",
+            connect_args={"check_same_thread": False},
+        )
+
+engine = _create_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

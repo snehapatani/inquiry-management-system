@@ -1,4 +1,4 @@
-const BASE = "http://192.168.1.195:8000";
+const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 // ── token helpers ──────────────────────────────────────────────
 export function getToken() { return localStorage.getItem("authToken"); }

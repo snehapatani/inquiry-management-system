@@ -8,6 +8,7 @@ import models, schemas
 from database import engine, get_db, Base
 from inquiry_parser import parse_inquiry, normalize_product_name
 from auth import get_current_user, require_admin, hash_password, verify_password, create_access_token
+from logger import logger
 
 # Request models
 class DeleteInquiryRequest(BaseModel):
@@ -37,7 +38,11 @@ app = FastAPI(title="Inquiry MS API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://192.168.1.195:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://192.168.1.195:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,14 +83,23 @@ def parse_mode():
 
 @app.post("/auth/login", response_model=schemas.Token)
 def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(
-        models.User.Username == req.username,
-        models.User.IsActive == True,
-    ).first()
-    if not user or not verify_password(req.password, user.HashedPassword):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-    token = create_access_token({"sub": str(user.UserID), "username": user.Username, "role": user.Role})
-    return schemas.Token(access_token=token)
+    try:
+        logger.info(f"Login attempt: {req.username}")
+        user = db.query(models.User).filter(
+            models.User.Username == req.username,
+            models.User.IsActive == True,
+        ).first()
+        if not user or not verify_password(req.password, user.HashedPassword):
+            logger.warning(f"Failed login attempt: {req.username} - Invalid credentials")
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+        token = create_access_token({"sub": str(user.UserID), "username": user.Username, "role": user.Role})
+        logger.info(f"Successful login: {req.username} (ID: {user.UserID})")
+        return schemas.Token(access_token=token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error for {req.username}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ── Protected: Auth management ────────────────────────────────
@@ -98,38 +112,61 @@ def list_users(_: models.User = Depends(require_admin), db: Session = Depends(ge
     return db.query(models.User).all()
 
 @priv.post("/auth/users", response_model=schemas.UserOut)
-def create_user(data: schemas.UserCreate, _: models.User = Depends(require_admin), db: Session = Depends(get_db)):
-    if db.query(models.User).filter(models.User.Username == data.Username).first():
-        raise HTTPException(400, "Username already exists")
-    user = models.User(
-        Username=data.Username,
-        FullName=data.FullName,
-        HashedPassword=hash_password(data.Password),
-        Role=data.Role,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+def create_user(data: schemas.UserCreate, admin: models.User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Admin {admin.Username} creating user: {data.Username}")
+        if db.query(models.User).filter(models.User.Username == data.Username).first():
+            logger.warning(f"User creation failed: {data.Username} already exists")
+            raise HTTPException(400, "Username already exists")
+        user = models.User(
+            Username=data.Username,
+            FullName=data.FullName,
+            HashedPassword=hash_password(data.Password),
+            Role=data.Role,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info(f"User created successfully: {data.Username} (ID: {user.UserID})")
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating user {data.Username}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @priv.delete("/auth/users/{user_id}")
 def delete_user(user_id: int, current_user: models.User = Depends(require_admin), db: Session = Depends(get_db)):
-    if user_id == current_user.UserID:
-        raise HTTPException(400, "Cannot deactivate your own account")
-    user = db.query(models.User).filter(models.User.UserID == user_id).first()
-    if not user:
-        raise HTTPException(404, "User not found")
-    user.IsActive = False
-    db.commit()
-    return {"ok": True}
+    try:
+        logger.info(f"Admin {current_user.Username} deactivating user: {user_id}")
+        if user_id == current_user.UserID:
+            logger.warning(f"Admin {current_user.Username} tried to deactivate own account")
+            raise HTTPException(400, "Cannot deactivate your own account")
+        user = db.query(models.User).filter(models.User.UserID == user_id).first()
+        if not user:
+            logger.warning(f"User deactivation failed: User {user_id} not found")
+            raise HTTPException(404, "User not found")
+        user.IsActive = False
+        db.commit()
+        logger.info(f"User deactivated successfully: {user.Username} (ID: {user_id})")
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deactivating user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ── Protected: LLM Parser ─────────────────────────────────────
 @priv.post("/parse", response_model=schemas.ParsedInquiry)
-def parse(req: schemas.ParseRequest):
+def parse(req: schemas.ParseRequest, current_user: models.User = Depends(get_current_user)):
     try:
-        return parse_inquiry(req.raw_text)
+        logger.info(f"User {current_user.Username} parsing inquiry (text length: {len(req.raw_text)})")
+        result = parse_inquiry(req.raw_text)
+        logger.info(f"Inquiry parsed successfully by {current_user.Username}")
+        return result
     except Exception as e:
+        logger.error(f"Error parsing inquiry by {current_user.Username}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -139,12 +176,18 @@ def list_customers(db: Session = Depends(get_db)):
     return db.query(models.Customer).filter(models.Customer.IsActive == 1).all()
 
 @priv.post("/customers", response_model=schemas.CustomerOut)
-def create_customer(data: schemas.CustomerCreate, db: Session = Depends(get_db)):
-    customer = models.Customer(**data.model_dump())
-    db.add(customer)
-    db.commit()
-    db.refresh(customer)
-    return customer
+def create_customer(data: schemas.CustomerCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"User {current_user.Username} creating customer: {data.Name}")
+        customer = models.Customer(**data.model_dump())
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+        logger.info(f"Customer created successfully: {data.Name} (ID: {customer.CustomerID})")
+        return customer
+    except Exception as e:
+        logger.error(f"Error creating customer {data.Name}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @priv.get("/customers/{customer_id}", response_model=schemas.CustomerOut)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):
@@ -161,8 +204,11 @@ def list_inquiries(
     customer_id: Optional[int] = None,
     customer_name: Optional[str] = None,
     product_name: Optional[str] = None,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    filters = f"status={status}, customer_id={customer_id}, customer_name={customer_name}, product_name={product_name}"
+    logger.info(f"User {current_user.Username} listing inquiries with filters: {filters}")
     rows = (
         db.query(
             models.Inquiry.InquiryID,
@@ -242,10 +288,12 @@ def list_inquiries(
             MatchingItemIDs=matching_items_map.get(row.InquiryID, []),
         )
         result.append(out)
+    logger.info(f"Retrieved {len(result)} inquiries for user {current_user.Username}")
     return result
 
 @priv.post("/inquiries", response_model=schemas.InquiryOut)
-def create_inquiry(data: schemas.InquiryCreate, db: Session = Depends(get_db)):
+def create_inquiry(data: schemas.InquiryCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    logger.info(f"User {current_user.Username} creating inquiry for customer {data.CustomerID} with {len(data.Items)} items")
     items = data.Items
     inquiry_data = data.model_dump(exclude={"Items"})
     inquiry = models.Inquiry(**inquiry_data)
@@ -266,6 +314,7 @@ def create_inquiry(data: schemas.InquiryCreate, db: Session = Depends(get_db)):
         db.add(db_item)
     db.commit()
     db.refresh(inquiry)
+    logger.info(f"Inquiry created successfully by {current_user.Username}: InquiryID={inquiry.InquiryID}")
     return inquiry
 
 @priv.get("/inquiries/{inquiry_id}", response_model=schemas.InquiryDetail)
@@ -349,7 +398,18 @@ def list_vendors(db: Session = Depends(get_db)):
         db.query(models.Vendor, func.count(models.VendorProduct.VendorProductID).label("ProductCount"))
         .outerjoin(models.VendorProduct, (models.VendorProduct.VendorID == models.Vendor.VendorID) & (models.VendorProduct.IsAvailable == 1))
         .filter(models.Vendor.IsActive == 1)
-        .group_by(models.Vendor.VendorID)
+        .group_by(
+            models.Vendor.VendorID,
+            models.Vendor.VendorName,
+            models.Vendor.ContactPerson,
+            models.Vendor.Email,
+            models.Vendor.Phone,
+            models.Vendor.City,
+            models.Vendor.Region,
+            models.Vendor.IsActive,
+            models.Vendor.CreatedBy,
+            models.Vendor.CreatedAt,
+        )
         .all()
     )
     result = []
