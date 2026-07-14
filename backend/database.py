@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from pydantic_settings import BaseSettings
 from typing import Optional
 from sqlalchemy.engine import URL
+from sqlalchemy import text
 
 
 class Settings(BaseSettings):
@@ -51,7 +52,7 @@ def _create_engine():
 
         engine = create_engine(connection_url, echo=False, pool_pre_ping=True)
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         print(f"✅ Connected to SQL Server: {settings.DB_SERVER}")
         return engine
     except Exception as e:

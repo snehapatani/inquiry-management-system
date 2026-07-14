@@ -40,9 +40,9 @@ info_handler = TimedRotatingFileHandler(
 info_handler.setLevel(logging.INFO)
 info_handler.setFormatter(log_format)
 
-# Console handler for development
+# Console handler for development (only errors to reduce noise)
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.ERROR)
 console_handler.setFormatter(log_format)
 
 # Add handlers to logger

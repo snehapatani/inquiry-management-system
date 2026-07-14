@@ -75,13 +75,13 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
     return sorted;
   }
 
-  useEffect(() => { fetchInquiries(filter, customerSearch, productSearch, createdBySearch); }, [filter]);
+  useEffect(() => { fetchInquiries(filter, customerSearch, productSearch, createdBySearch); }, [filter, customerSearch, productSearch, createdBySearch]);
 
   useEffect(() => {
     if (inquiries.length > 0) {
       setInquiries(prev => sortInquiries(prev, sortBy, sortDir));
     }
-  }, [sortBy, sortDir]);
+  }, [sortBy, sortDir, inquiries.length]);
 
   function handleSort(column) {
     if (sortBy === column) {
@@ -92,10 +92,8 @@ export default function InquiryList({ onOpen, onGoToWorkQueue }) {
     }
   }
 
-  function handleSearch() { fetchInquiries(filter, customerSearch, productSearch, createdBySearch, sortBy, sortDir); }
+  function handleSearch() { fetchInquiries(filter, customerSearch, productSearch, createdBySearch); }
   function handleKeyDown(e) { if (e.key === "Enter") handleSearch(); }
-
-  useEffect(() => { fetchInquiries(filter, customerSearch, productSearch, createdBySearch, sortBy, sortDir); }, [sortBy, sortDir]);
 
   function toggleRow(inqId) {
     setSelected(s => {
