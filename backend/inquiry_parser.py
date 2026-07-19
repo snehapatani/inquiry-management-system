@@ -11,6 +11,8 @@ from schemas import ParsedInquiry, ParsedItem
 
 # ── mock parser ───────────────────────────────────────────────
 _QTY_RE  = re.compile(r"(\d[\d,\.]*)\s*(KG|KGS|MT|MTS|GM|GMS|LT|LIT|G|L)\b", re.I)
+_MOQ_RE  = re.compile(r"\bMOQ\b", re.I)
+_NUMBERED_LIST_RE = re.compile(r"^\s*\d+[\.\)]\s+")
 _GRADE_RE = re.compile(r"\b(USP|BP|IP|EP|AR|LR|NF|JP)\b", re.I)
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.\w+")
 _PHONE_RE = re.compile(r"[\+\d][\d\s\-\(\)]{7,}")
@@ -199,10 +201,23 @@ def _mock_parse(raw_text: str) -> ParsedInquiry:
     phone_match = next((_PHONE_RE.search(l) for l in lines if _PHONE_RE.search(l) and "@" not in l), None)
     phone = phone_match.group().strip() if phone_match else None
 
-    # Heuristic: lines that contain a quantity pattern are product lines
+    # Classify lines: product lines (explicit qty or MOQ or numbered list), and other lines
     product_lines, other_lines = [], []
+
     for line in lines:
+        is_product = False
+
+        # Check if line has explicit quantity (e.g., "5 KG")
         if _QTY_RE.search(line):
+            is_product = True
+        # Check if line has MOQ notation
+        elif _MOQ_RE.search(line):
+            is_product = True
+        # Check if line starts with number (numbered list format: 1. 2. 3.)
+        elif _NUMBERED_LIST_RE.match(line):
+            is_product = True
+
+        if is_product:
             product_lines.append(line)
         else:
             other_lines.append(line)
@@ -210,20 +225,40 @@ def _mock_parse(raw_text: str) -> ParsedInquiry:
     # Build items from product lines
     items = []
     for line in product_lines:
-        m = _QTY_RE.search(line)
-        qty_str, unit_raw = m.group(1), m.group(2)
-        qty = float(qty_str.replace(",", ""))
-        unit = _UNIT_MAP.get(unit_raw.lower(), unit_raw.upper())
-        # product name = everything before the quantity match, cleaned up
-        name = line[:m.start()].strip().strip(",-").strip()
-        if not name:
-            name = line[m.end():].strip().strip(",-").strip()
+        qty = None
+        unit = None
+        name = line
+
+        # Try to extract quantity and unit
+        qty_match = _QTY_RE.search(line)
+        if qty_match:
+            qty_str, unit_raw = qty_match.group(1), qty_match.group(2)
+            qty = float(qty_str.replace(",", ""))
+            unit = _UNIT_MAP.get(unit_raw.lower(), unit_raw.upper())
+            # product name = everything before the quantity match, cleaned up
+            name = line[:qty_match.start()].strip().strip(",-").strip()
+            if not name:
+                name = line[qty_match.end():].strip().strip(",-").strip()
+        else:
+            # No explicit quantity, check if it's MOQ
+            moq_match = _MOQ_RE.search(line)
+            if moq_match:
+                # product name = everything before MOQ
+                name = line[:moq_match.start()].strip().strip(",-").strip()
+                if not name:
+                    name = line[moq_match.end():].strip().strip(",-").strip()
+
         # Remove numbering prefix like "1)" or "1." or "1 )"
         name = re.sub(r"^\d+[\)\.\s]+", "", name).strip()
         # Remove bullet points and dashes: •, ◦, ▪, -, *, etc.
         name = re.sub(r"^[\•◦▪\-\*]+\s*", "", name).strip()
+        # Remove trailing dashes and arrows
+        name = re.sub(r"\s*[-—→>]+\s*$", "", name).strip()
+
+        # Extract grade
         grade_m = _GRADE_RE.search(line)
         grade = grade_m.group(1).upper() if grade_m else None
+
         if name:
             items.append(ParsedItem(
                 product_number=len(items) + 1,

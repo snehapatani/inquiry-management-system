@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "local"  # "local" uses SQLite, "production" uses SQL Server
     DB_SERVER: str = "192.168.1.195"
     DB_NAME: str = "InquiryMS"
     DB_USER: Optional[str] = None
@@ -22,7 +23,8 @@ class Settings(BaseSettings):
 settings = Settings()
 
 _use_real_db = (
-    settings.DB_USER
+    settings.ENVIRONMENT.lower() == "production"
+    and settings.DB_USER
     and settings.DB_USER not in ("your_sql_login", "")
     and settings.DB_PASSWORD not in ("your_password", "", None)
 )

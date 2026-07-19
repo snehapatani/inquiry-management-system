@@ -10,11 +10,13 @@ vi.mock("../api", () => ({
   getVendorProducts: vi.fn(),
   createVendorProduct: vi.fn(),
   deleteVendorProduct: vi.fn(),
+  autocompleteProducts: vi.fn(),
 }));
 
 import {
   getVendors, createVendor, updateVendor, deleteVendor,
   getVendorProducts, createVendorProduct, deleteVendorProduct,
+  autocompleteProducts,
 } from "../api";
 
 const VENDORS = [
@@ -101,6 +103,154 @@ describe("VendorMaster — products modal", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/INR 1200/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("VendorMaster — product autocomplete feature", () => {
+  it("does not show suggestions when product name has less than 2 characters", async () => {
+    autocompleteProducts.mockResolvedValue([]);
+    await renderVendors();
+    await waitFor(() => screen.getByText("Alpha Chemicals"));
+
+    fireEvent.click(screen.getByText("Alpha Chemicals"));
+    await waitFor(() => screen.getByText("Add Product"));
+
+    const productInputs = screen.getAllByDisplayValue("");
+    const productNameInput = productInputs[0];
+    fireEvent.change(productNameInput, { target: { value: "A" } });
+
+    await waitFor(() => {
+      expect(autocompleteProducts).not.toHaveBeenCalled();
+    });
+  });
+
+  it("calls autocomplete API when typing 2+ characters in product name", async () => {
+    autocompleteProducts.mockResolvedValue([]);
+    await renderVendors();
+    await waitFor(() => screen.getByText("Alpha Chemicals"));
+
+    fireEvent.click(screen.getByText("Alpha Chemicals"));
+    await waitFor(() => screen.getByText("Add Product"));
+
+    const productInputs = screen.getAllByDisplayValue("");
+    const productNameInput = productInputs[0];
+
+    await act(async () => {
+      fireEvent.change(productNameInput, { target: { value: "Az" } });
+    });
+
+    await waitFor(() => {
+      expect(autocompleteProducts).toHaveBeenCalledWith("Az");
+    });
+  });
+
+  it("displays product suggestions in a dropdown", async () => {
+    const suggestions = [
+      { ProductName: "Azithromycin" },
+      { ProductName: "Amoxicillin" },
+    ];
+    autocompleteProducts.mockResolvedValue(suggestions);
+
+    await renderVendors();
+    await waitFor(() => screen.getByText("Alpha Chemicals"));
+
+    fireEvent.click(screen.getByText("Alpha Chemicals"));
+    await waitFor(() => screen.getByText("Add Product"));
+
+    const productInputs = screen.getAllByDisplayValue("");
+    const productNameInput = productInputs[0];
+
+    await act(async () => {
+      fireEvent.change(productNameInput, { target: { value: "Az" } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Azithromycin")).toBeInTheDocument();
+      expect(screen.getByText("Amoxicillin")).toBeInTheDocument();
+    });
+  });
+
+  it("selects a product suggestion and fills the field", async () => {
+    const suggestions = [
+      { ProductName: "Azithromycin" },
+    ];
+    autocompleteProducts.mockResolvedValue(suggestions);
+
+    await renderVendors();
+    await waitFor(() => screen.getByText("Alpha Chemicals"));
+
+    fireEvent.click(screen.getByText("Alpha Chemicals"));
+    await waitFor(() => screen.getByText("Add Product"));
+
+    const productInputs = screen.getAllByDisplayValue("");
+    const productNameInput = productInputs[0];
+
+    await act(async () => {
+      fireEvent.change(productNameInput, { target: { value: "Az" } });
+    });
+
+    await waitFor(() => {
+      const suggestionItem = screen.getByText("Azithromycin");
+      fireEvent.mouseDown(suggestionItem);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Azithromycin")).toBeInTheDocument();
+    });
+  });
+
+  it("hides suggestions when product name field is blurred", async () => {
+    const suggestions = [
+      { ProductName: "Azithromycin" },
+    ];
+    autocompleteProducts.mockResolvedValue(suggestions);
+
+    await renderVendors();
+    await waitFor(() => screen.getByText("Alpha Chemicals"));
+
+    fireEvent.click(screen.getByText("Alpha Chemicals"));
+    await waitFor(() => screen.getByText("Add Product"));
+
+    const productInputs = screen.getAllByDisplayValue("");
+    const productNameInput = productInputs[0];
+
+    await act(async () => {
+      fireEvent.change(productNameInput, { target: { value: "Az" } });
+    });
+
+    await waitFor(() => {
+      const suggestionItem = screen.getByText("Azithromycin");
+      expect(suggestionItem).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.blur(productNameInput);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Azithromycin")).not.toBeInTheDocument();
+    });
+  });
+
+  it("clears suggestions when API returns empty results", async () => {
+    autocompleteProducts.mockResolvedValue([]);
+
+    await renderVendors();
+    await waitFor(() => screen.getByText("Alpha Chemicals"));
+
+    fireEvent.click(screen.getByText("Alpha Chemicals"));
+    await waitFor(() => screen.getByText("Add Product"));
+
+    const productInputs = screen.getAllByDisplayValue("");
+    const productNameInput = productInputs[0];
+
+    await act(async () => {
+      fireEvent.change(productNameInput, { target: { value: "XYZ" } });
+    });
+
+    await waitFor(() => {
+      expect(autocompleteProducts).toHaveBeenCalled();
     });
   });
 });

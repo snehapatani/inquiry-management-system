@@ -40,6 +40,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://192.168.1.195:3000",
         "http://127.0.0.1:3000",
     ],
@@ -47,6 +48,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    # Prevent browsers from MIME-sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Enable XSS protection
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Prevent clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+    # Don't cache sensitive pages
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    # HSTS: Enforce HTTPS (31536000 seconds = 1 year)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # Protected router — every route here requires a valid JWT
 priv = APIRouter()
@@ -89,7 +108,24 @@ def login(req: schemas.LoginRequest, db: Session = Depends(get_db)):
             models.User.Username == req.username,
             models.User.IsActive == True,
         ).first()
-        if not user or not verify_password(req.password, user.HashedPassword):
+
+        # Handle both plain password (for backward compatibility) and hashed password
+        password_to_verify = req.password
+        # If password looks like base64 encoded (client-side hashed), decode it
+        try:
+            import base64
+            # Try to decode as base64
+            decoded = base64.b64decode(req.password).decode('utf-8')
+            # If decoded string contains ":", it's likely the base64(username:password) format
+            if ":" in decoded:
+                _, password_to_verify = decoded.split(":", 1)
+                logger.debug(f"Decoded base64 password for user: {req.username}")
+        except Exception as e:
+            # If decoding fails, use original password (backward compatibility)
+            password_to_verify = req.password
+            logger.debug(f"Could not decode password as base64, using as-is: {str(e)}")
+
+        if not user or not verify_password(password_to_verify, user.HashedPassword):
             logger.warning(f"Failed login attempt: {req.username} - Invalid credentials")
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         token = create_access_token({"sub": str(user.UserID), "username": user.Username, "role": user.Role})
@@ -188,6 +224,27 @@ def create_customer(data: schemas.CustomerCreate, current_user: models.User = De
     except Exception as e:
         logger.error(f"Error creating customer {data.Name}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@priv.get("/customers/autocomplete")
+def autocomplete_customers(q: str = Query(""), db: Session = Depends(get_db)):
+    query = q.strip().lower()
+    if not query:
+        return []
+    customers = db.query(models.Customer).filter(
+        models.Customer.IsActive == 1,
+        models.Customer.Name.ilike(f"%{query}%")
+    ).limit(10).all()
+    return [{"CustomerID": c.CustomerID, "Name": c.Name, "Company": c.Company, "Email": c.Email, "Phone": c.Phone} for c in customers]
+
+@priv.get("/products/autocomplete")
+def autocomplete_products(q: str = Query(""), db: Session = Depends(get_db)):
+    query = q.strip().lower()
+    if not query:
+        return []
+    products = db.query(models.InquiryItem.ProductNameRaw).filter(
+        models.InquiryItem.ProductNameRaw.ilike(f"%{query}%")
+    ).distinct().limit(10).all()
+    return [{"ProductName": p[0]} for p in products if p[0]]
 
 @priv.get("/customers/{customer_id}", response_model=schemas.CustomerOut)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):

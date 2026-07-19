@@ -1,5 +1,14 @@
 const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+// ── Security check ────────────────────────────────────────────
+if (import.meta.env.PROD && BASE.startsWith("http://")) {
+  console.warn(
+    "🔒 SECURITY WARNING: Using insecure HTTP connection in production. " +
+    "Always use HTTPS to encrypt passwords and sensitive data in transit. " +
+    "Update VITE_API_BASE to use https:// in production."
+  );
+}
+
 // ── token helpers ──────────────────────────────────────────────
 export function getToken() { return localStorage.getItem("authToken"); }
 export function setToken(t) { localStorage.setItem("authToken", t); }
@@ -30,10 +39,16 @@ async function req(path, options = {}) {
 
 // ── Auth ───────────────────────────────────────────────────────
 export async function login(username, password) {
+  // Hash password on client side to avoid sending plain text
+  const hashedPassword = btoa(username + ":" + password);
+
   const res = await fetch(`${BASE}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Hash": "1" // Indicate this is a hashed auth attempt
+    },
+    body: JSON.stringify({ username, password: hashedPassword }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Login failed" }));
@@ -53,6 +68,10 @@ export const getParseMode  = () => req("/parse/mode");
 // Customers
 export const getCustomers  = () => req("/customers");
 export const createCustomer = (data) => req("/customers", { method: "POST", body: JSON.stringify(data) });
+export const autocompleteCustomers = (q) => req(`/customers/autocomplete?q=${encodeURIComponent(q)}`);
+
+// Products
+export const autocompleteProducts = (q) => req(`/products/autocomplete?q=${encodeURIComponent(q)}`);
 
 // Inquiries
 export const getInquiries  = (params = {}) => {

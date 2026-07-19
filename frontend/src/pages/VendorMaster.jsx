@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getVendors, createVendor, updateVendor, deleteVendor, getVendorProducts, createVendorProduct, deleteVendorProduct } from "../api";
+import { getVendors, createVendor, updateVendor, deleteVendor, getVendorProducts, createVendorProduct, deleteVendorProduct, autocompleteProducts } from "../api";
 import { formatDate } from "../utils";
 
 const VENDOR_FIELDS = [
@@ -28,6 +28,8 @@ export default function VendorMaster() {
   const [modalForm, setModalForm] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [createdBy, setCreatedBy] = useState(() => localStorage.getItem("createdBy") || "");
+  const [productSuggestions, setProductSuggestions] = useState([]);
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
 
   function handleCreatedByChange(val) {
     setCreatedBy(val);
@@ -113,6 +115,28 @@ export default function VendorMaster() {
     setProducts(p);
   }
 
+  async function handleProductNameChange(value) {
+    setProductForm(p => ({ ...p, ProductName: value }));
+    if (value.trim().length < 2) {
+      setProductSuggestions([]);
+      setShowProductSuggestions(false);
+      return;
+    }
+    try {
+      const results = await autocompleteProducts(value);
+      setProductSuggestions(results);
+      setShowProductSuggestions(results.length > 0);
+    } catch (e) {
+      setProductSuggestions([]);
+    }
+  }
+
+  function selectProductSuggestion(product) {
+    setProductForm(p => ({ ...p, ProductName: product.ProductName }));
+    setProductSuggestions([]);
+    setShowProductSuggestions(false);
+  }
+
   return (
     <div>
       {/* Header */}
@@ -190,10 +214,29 @@ export default function VendorMaster() {
               <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8, color: "#003366" }}>Add Product</div>
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr 1fr 2fr auto", gap: 8, alignItems: "end", marginBottom: 8 }}>
                 {PRODUCT_FIELDS.map(([f, label]) => (
-                  <div key={f}>
+                  <div key={f} style={{ position: "relative" }}>
                     <label style={{ fontSize: 11, color: "#555" }}>{label}</label>
-                    <input value={productForm[f] || ""} onChange={e => setProductForm(p => ({ ...p, [f]: e.target.value }))}
+                    <input
+                      value={productForm[f] || ""}
+                      onChange={e => f === "ProductName" ? handleProductNameChange(e.target.value) : setProductForm(p => ({ ...p, [f]: e.target.value }))}
+                      onFocus={() => f === "ProductName" && productSuggestions.length > 0 && setShowProductSuggestions(true)}
+                      onBlur={() => f === "ProductName" && setTimeout(() => setShowProductSuggestions(false), 150)}
                       style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                    {f === "ProductName" && showProductSuggestions && productSuggestions.length > 0 && (
+                      <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", zIndex: 10, maxHeight: 150, overflowY: "auto" }}>
+                        {productSuggestions.map((product, idx) => (
+                          <div
+                            key={idx}
+                            onMouseDown={() => selectProductSuggestion(product)}
+                            style={{ padding: "6px 10px", cursor: "pointer", borderBottom: idx < productSuggestions.length - 1 ? "1px solid #f0f0f0" : "none", fontSize: 12 }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+                            onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                          >
+                            <div style={{ color: "#003366" }}>{product.ProductName}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

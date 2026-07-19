@@ -1,7 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { login } from "../api";
 
 export default function LoginPage({ onLogin }) {
+  useEffect(() => {
+    // Security check: warn if not using HTTPS in production
+    if (window.location.protocol !== "https:" && import.meta.env.PROD) {
+      console.warn(
+        "🔒 SECURITY WARNING: This application is being accessed over HTTP. " +
+        "Always use HTTPS in production to encrypt passwords and sensitive data."
+      );
+    }
+  }, []);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -14,6 +23,8 @@ export default function LoginPage({ onLogin }) {
     setError("");
     try {
       const { access_token } = await login(username.trim(), password);
+      // Clear password from memory immediately after successful login
+      setPassword("");
       onLogin(access_token);
     } catch (err) {
       setError(err.message || "Login failed");

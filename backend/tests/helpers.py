@@ -7,8 +7,14 @@ def make_vendor(client, name="Test Vendor", **kwargs):
     return r.json()
 
 
-def make_customer(client, name="Test Customer", company="Test Co"):
-    r = client.post("/customers", json={"Name": name, "Company": company})
+def make_customer(client, name="Test Customer", company="Test Co", email=None, phone=None, **kwargs):
+    payload = {"Name": name, "Company": company}
+    if email:
+        payload["Email"] = email
+    if phone:
+        payload["Phone"] = phone
+    payload.update(kwargs)
+    r = client.post("/customers", json=payload)
     assert r.status_code == 200, r.text
     return r.json()
 

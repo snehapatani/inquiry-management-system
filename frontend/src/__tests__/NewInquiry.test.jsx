@@ -7,9 +7,10 @@ vi.mock("../api", () => ({
   createCustomer: vi.fn(),
   createInquiry: vi.fn(),
   getParseMode: vi.fn(),
+  autocompleteCustomers: vi.fn(),
 }));
 
-import { parseInquiry, createCustomer, createInquiry, getParseMode } from "../api";
+import { parseInquiry, createCustomer, createInquiry, getParseMode, autocompleteCustomers } from "../api";
 
 const PARSED = {
   customer_name: "Rajesh Kumar",
@@ -109,5 +110,138 @@ describe("NewInquiry — parse and save flow", () => {
     await waitFor(() => screen.getByText("Save Inquiry"));
     fireEvent.click(screen.getByText("Save Inquiry"));
     await waitFor(() => { expect(screen.getByText(/At least one product/i)).toBeInTheDocument(); });
+  });
+
+  it("saves inquiry successfully and calls callbacks", async () => {
+    const onSaved = vi.fn();
+    let component;
+    await act(async () => {
+      ({ container: component } = render(<NewInquiry onSaved={onSaved} />));
+    });
+    fireEvent.change(component.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    await act(async () => { fireEvent.click(screen.getByText("Save Inquiry")); });
+    await waitFor(() => {
+      expect(createCustomer).toHaveBeenCalled();
+      expect(createInquiry).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("NewInquiry — autocomplete feature", () => {
+  it("does not show suggestions when customer name field has less than 2 characters", async () => {
+    const c = await renderForm();
+    fireEvent.change(c.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    const nameInput = screen.getByDisplayValue("Rajesh Kumar");
+    fireEvent.change(nameInput, { target: { value: "R" } });
+    await waitFor(() => {
+      expect(autocompleteCustomers).not.toHaveBeenCalled();
+    });
+  });
+
+  it("calls autocomplete API when typing 2+ characters in customer name", async () => {
+    autocompleteCustomers.mockResolvedValue([]);
+    const c = await renderForm();
+    fireEvent.change(c.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    const nameInput = screen.getByDisplayValue("Rajesh Kumar");
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: "Ra" } });
+    });
+    await waitFor(() => {
+      expect(autocompleteCustomers).toHaveBeenCalledWith("Ra");
+    });
+  });
+
+  it("displays customer suggestions in a dropdown", async () => {
+    const suggestions = [
+      { CustomerID: 1, Name: "Rajesh Kumar", Company: "Alpha Pharma", Email: "rajesh@alpha.com", Phone: "9876543210" },
+      { CustomerID: 2, Name: "Rajesh Singh", Company: "Beta Pharma", Email: "rajesh@beta.com", Phone: "9876543211" },
+    ];
+    autocompleteCustomers.mockResolvedValue(suggestions);
+    const c = await renderForm();
+    fireEvent.change(c.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    const nameInput = screen.getByDisplayValue("Rajesh Kumar");
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: "Rajesh" } });
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Rajesh Kumar")).toBeInTheDocument();
+      expect(screen.getByText("Rajesh Singh")).toBeInTheDocument();
+    });
+  });
+
+  it("selects a suggestion and fills customer details", async () => {
+    const suggestions = [
+      { CustomerID: 1, Name: "Rajesh Kumar", Company: "Alpha Pharma", Email: "rajesh@alpha.com", Phone: "9876543210" },
+    ];
+    autocompleteCustomers.mockResolvedValue(suggestions);
+    const c = await renderForm();
+    fireEvent.change(c.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    const nameInput = screen.getByDisplayValue("Rajesh Kumar");
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: "Rajesh" } });
+    });
+    await waitFor(() => screen.getByText("Rajesh Kumar"));
+    const suggestionItem = screen.getAllByText("Rajesh Kumar")[1];
+    await act(async () => {
+      fireEvent.click(suggestionItem);
+    });
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Alpha Pharma")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("rajesh@alpha.com")).toBeInTheDocument();
+    });
+  });
+
+  it("hides suggestions when customer name field is blurred", async () => {
+    const suggestions = [
+      { CustomerID: 1, Name: "Rajesh Kumar", Company: "Alpha Pharma", Email: "rajesh@alpha.com", Phone: "9876543210" },
+    ];
+    autocompleteCustomers.mockResolvedValue(suggestions);
+    const c = await renderForm();
+    fireEvent.change(c.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    const nameInput = screen.getByDisplayValue("Rajesh Kumar");
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: "Rajesh" } });
+    });
+    await waitFor(() => screen.getByText("Alpha Pharma"));
+    await act(async () => {
+      fireEvent.blur(nameInput);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Alpha Pharma")).not.toBeInTheDocument();
+    });
+  });
+
+  it("clears suggestions when API returns empty results", async () => {
+    autocompleteCustomers.mockResolvedValue([]);
+    const c = await renderForm();
+    fireEvent.change(c.querySelector("textarea"), { target: { value: "Azithromycin 125 KG" } });
+    fireEvent.change(screen.getByPlaceholderText(/Enter your name/i), { target: { value: "Paras" } });
+    await act(async () => { fireEvent.click(screen.getByText("Parse Inquiry")); });
+    await waitFor(() => screen.getByText("Save Inquiry"));
+    const nameInput = screen.getByDisplayValue("Rajesh Kumar");
+    await act(async () => {
+      fireEvent.change(nameInput, { target: { value: "XYZ" } });
+    });
+    await waitFor(() => {
+      expect(autocompleteCustomers).toHaveBeenCalled();
+    });
   });
 });

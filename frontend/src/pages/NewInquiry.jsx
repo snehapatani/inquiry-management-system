@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import { parseInquiry, createCustomer, createInquiry } from "../api";
+import { parseInquiry, createCustomer, createInquiry, autocompleteCustomers } from "../api";
 
 const SOURCES = ["WhatsApp", "Email", "Phone", "Other"];
 const CATEGORIES = ["End User", "Trader", "Distributor", "Not Identified"];
@@ -48,6 +48,9 @@ export default function NewInquiry({ onSaved }) {
   const [touched, setTouched]   = useState({});
   const [createdBy, setCreatedBy] = useState(() => localStorage.getItem("createdBy") || "");
   const [showCalendar, setShowCalendar] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const textErr    = touched.rawText   && !rawText.trim();
   const createdErr = touched.createdBy && !createdBy.trim();
@@ -105,6 +108,37 @@ export default function NewInquiry({ onSaved }) {
     setParsed(null);
     setError("");
     setSaveErrors([]);
+  }
+
+  async function handleCustomerNameChange(value) {
+    setParsed(p => ({ ...p, customer_name: value }));
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    setLoadingSuggestions(true);
+    try {
+      const results = await autocompleteCustomers(value);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    } catch (e) {
+      setSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
+
+  function selectCustomerSuggestion(customer) {
+    setParsed(p => ({
+      ...p,
+      customer_name: customer.Name,
+      customer_company: customer.Company || p.customer_company,
+      customer_email: customer.Email || p.customer_email,
+      customer_phone: customer.Phone || p.customer_phone,
+    }));
+    setSuggestions([]);
+    setShowSuggestions(false);
   }
 
   function validateBeforeSave() {
@@ -229,11 +263,32 @@ export default function NewInquiry({ onSaved }) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
               {[["customer_name","Name"],["customer_company","Company"],["customer_email","Email"],["customer_phone","Phone"]].map(([k, label]) => (
-                <div key={k}>
+                <div key={k} style={{ position: "relative" }}>
                   <label style={{ fontSize: 12, color: "#555" }}>{label}{k === "customer_name" && <span style={{ color: "#c00" }}> *</span>}</label>
-                  <input value={parsed[k] || ""} onChange={e => setParsed(p => ({ ...p, [k]: e.target.value }))}
+                  <input
+                    value={parsed[k] || ""}
+                    onChange={e => k === "customer_name" ? handleCustomerNameChange(e.target.value) : setParsed(p => ({ ...p, [k]: e.target.value }))}
+                    onFocus={() => k === "customer_name" && suggestions.length > 0 && setShowSuggestions(true)}
+                    onBlur={() => k === "customer_name" && setTimeout(() => setShowSuggestions(false), 150)}
                     style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box",
                       border: `1px solid ${k === "customer_name" && !parsed[k]?.trim() ? "#ffaa00" : "#ccc"}` }} />
+                  {k === "customer_name" && showSuggestions && suggestions.length > 0 && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", zIndex: 10, maxHeight: 200, overflowY: "auto" }}>
+                      {suggestions.map((customer, idx) => (
+                        <div
+                          key={idx}
+                          onMouseDown={() => selectCustomerSuggestion(customer)}
+                          style={{ padding: "8px 12px", cursor: "pointer", borderBottom: idx < suggestions.length - 1 ? "1px solid #f0f0f0" : "none", fontSize: 13 }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+                          onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                        >
+                          <div style={{ fontWeight: 600, color: "#003366" }}>{customer.Name}</div>
+                          {customer.Company && <div style={{ fontSize: 11, color: "#888" }}>{customer.Company}</div>}
+                          {customer.Email && <div style={{ fontSize: 11, color: "#888" }}>{customer.Email}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
