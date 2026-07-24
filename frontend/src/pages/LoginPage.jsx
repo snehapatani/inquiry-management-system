@@ -34,8 +34,8 @@ export default function LoginPage({ onLogin }) {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 40, width: 360, boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
+    <div style={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: window.innerWidth < 480 ? 24 : 40, width: "100%", maxWidth: 360, boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>💊</div>
           <h2 style={{ margin: 0, color: "#003366", fontSize: 22 }}>Inquiry MS</h2>

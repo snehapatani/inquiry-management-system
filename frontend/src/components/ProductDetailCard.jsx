@@ -1,6 +1,6 @@
 import { matchVendors, createQuote, setBestQuote, getQuotes, createVendor, getVendors } from "../api";
 import { formatDate } from "../utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 
@@ -13,6 +13,13 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
   const [quoteError, setQuoteError] = useState("");
   const [vendorsOpen, setVendorsOpen] = useState(false);
   const [showCalendarByItem, setShowCalendarByItem] = useState({});
+  const [mobile, setMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   function formatDateDisplay(dateStr) {
     if (!dateStr) return "";
@@ -109,7 +116,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 13, color: "#003366", fontWeight: 600 }}>{isExpanded ? "▾" : "▸"}</span>
-          <span style={{ fontWeight: 700, fontSize: mode === "detail" ? 15 : 14, color: "#003366" }}>{item.ProductNameNorm || item.ProductNameRaw}</span>
+          <span style={{ fontWeight: 700, fontSize: mode === "detail" ? 15 : 14, color: "#003366", userSelect: "text" }}>{item.ProductNameNorm || item.ProductNameRaw}</span>
 
           {mode === "detail" && item.ProductNameNorm && item.ProductNameNorm !== item.ProductNameRaw && (
             <span style={{ fontSize: 11, color: "#aaa" }}>({item.ProductNameRaw})</span>
@@ -179,42 +186,72 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
                 {vendorsOpen ? "▾" : "▸"} Matched Vendors ({matches.length})
               </div>
               {vendorsOpen && matches.length > 0 && (
-                <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse", marginTop: 8 }}>
-                  <thead>
-                    <tr style={{ background: "#e0ebff", borderBottom: "1px solid #d0e0ff" }}>
-                      {["Vendor", "Contact", "Phone", "Product", "Grade", "Lead Days", "Previous Price", "Quoted Date", "Action"].map(h => (
-                        <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, fontSize: 11 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                mobile ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
                     {matches.map(m => (
-                      <tr key={m.VendorProductID} style={{ borderBottom: "1px solid #e0e8ff" }}>
-                        <td style={{ padding: "6px 8px", fontWeight: 500 }}>{m.VendorName || "—"}</td>
-                        <td style={{ padding: "6px 8px" }}>{m.ContactPerson || "—"}</td>
-                        <td style={{ padding: "6px 8px" }}>{m.Phone || "—"}</td>
-                        <td style={{ padding: "6px 8px" }}>{m.ProductName || "—"}</td>
-                        <td style={{ padding: "6px 8px" }}>{m.Grade || "—"}</td>
-                        <td style={{ padding: "6px 8px", textAlign: "center" }}>{m.LeadTimeDays || "—"}</td>
-                        <td style={{ padding: "6px 8px" }}>{m.LastCurrency} {m.LastQuotedPrice || "—"}</td>
-                        <td style={{ padding: "6px 8px" }}>{formatDate(m.LastQuotedDate)}</td>
-                        <td style={{ padding: "6px 8px" }}>
-                          <button onClick={() => {
-                            updateNewQuote("_vendorName", m.VendorName);
-                            updateNewQuote("VendorID", m.VendorID);
-                            updateNewQuote("QuotedPrice", m.LastQuotedPrice || "");
-                            updateNewQuote("PriceUnit", m.LastPriceUnit || "");
-                            updateNewQuote("LeadTimeDays", m.LeadTimeDays || "");
-                            updateNewQuote("QuotedDate", m.LastQuotedDate ? m.LastQuotedDate.split('T')[0] : "");
-                          }}
-                            style={{ background: "#1a7a4a", color: "#fff", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>
-                            + Add to Quote
-                          </button>
-                        </td>
-                      </tr>
+                      <div key={m.VendorProductID} style={{ background: "#fff", border: "1px solid #d0e0ff", borderRadius: 6, padding: 10 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "#003366", marginBottom: 8 }}>{m.VendorName || "—"}</div>
+                        <div style={{ fontSize: 11, color: "#555", lineHeight: 1.6, marginBottom: 8 }}>
+                          <div><b>Contact:</b> {m.ContactPerson || "—"}</div>
+                          <div><b>Phone:</b> {m.Phone || "—"}</div>
+                          <div><b>Product:</b> {m.ProductName || "—"}</div>
+                          <div><b>Grade:</b> {m.Grade || "—"}</div>
+                          <div><b>Lead Days:</b> {m.LeadTimeDays || "—"}</div>
+                          <div><b>Price:</b> {m.LastCurrency} {m.LastQuotedPrice || "—"}</div>
+                          <div><b>Date:</b> {formatDate(m.LastQuotedDate)}</div>
+                        </div>
+                        <button onClick={() => {
+                          updateNewQuote("_vendorName", m.VendorName);
+                          updateNewQuote("VendorID", m.VendorID);
+                          updateNewQuote("QuotedPrice", m.LastQuotedPrice || "");
+                          updateNewQuote("PriceUnit", m.LastPriceUnit || "");
+                          updateNewQuote("LeadTimeDays", m.LeadTimeDays || "");
+                          updateNewQuote("QuotedDate", m.LastQuotedDate ? m.LastQuotedDate.split('T')[0] : "");
+                        }}
+                          style={{ width: "100%", background: "#1a7a4a", color: "#fff", border: "none", borderRadius: 4, padding: "6px 8px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                          + Add to Quote
+                        </button>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                ) : (
+                  <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse", marginTop: 8 }}>
+                    <thead>
+                      <tr style={{ background: "#e0ebff", borderBottom: "1px solid #d0e0ff" }}>
+                        {["Vendor", "Contact", "Phone", "Product", "Grade", "Lead Days", "Previous Price", "Quoted Date", "Action"].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, fontSize: 11 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matches.map(m => (
+                        <tr key={m.VendorProductID} style={{ borderBottom: "1px solid #e0e8ff" }}>
+                          <td style={{ padding: "6px 8px", fontWeight: 500 }}>{m.VendorName || "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>{m.ContactPerson || "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>{m.Phone || "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>{m.ProductName || "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>{m.Grade || "—"}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "center" }}>{m.LeadTimeDays || "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>{m.LastCurrency} {m.LastQuotedPrice || "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>{formatDate(m.LastQuotedDate)}</td>
+                          <td style={{ padding: "6px 8px" }}>
+                            <button onClick={() => {
+                              updateNewQuote("_vendorName", m.VendorName);
+                              updateNewQuote("VendorID", m.VendorID);
+                              updateNewQuote("QuotedPrice", m.LastQuotedPrice || "");
+                              updateNewQuote("PriceUnit", m.LastPriceUnit || "");
+                              updateNewQuote("LeadTimeDays", m.LeadTimeDays || "");
+                              updateNewQuote("QuotedDate", m.LastQuotedDate ? m.LastQuotedDate.split('T')[0] : "");
+                            }}
+                              style={{ background: "#1a7a4a", color: "#fff", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}>
+                              + Add to Quote
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
               )}
             </div>
           )}
@@ -222,7 +259,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
           {/* Add Quote Form */}
           <div style={{ background: "#fffbf0", borderRadius: 8, padding: 12, marginBottom: 12, border: "1px solid #ffe0a0" }}>
             <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8 }}>Add Quote (after contacting vendor offline)</div>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "2fr 1fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
               <div>
                 <label style={{ fontSize: 11, color: "#666" }}>Vendor <span style={{ color: "#c00" }}>*</span></label>
                 <input list={`vendor-list-${item.ItemID}`} placeholder="Type or select vendor…" value={form["_vendorName"] || ""}
@@ -232,7 +269,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
                     updateNewQuote("_vendorName", name);
                     updateNewQuote("VendorID", match ? match.VendorID : "");
                   }}
-                  style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                  style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
                 <datalist id={`vendor-list-${item.ItemID}`}>
                   {vendors.map(v => <option key={v.VendorID} value={v.VendorName} />)}
                 </datalist>
@@ -241,7 +278,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
                 <div key={f}>
                   <label style={{ fontSize: 11, color: "#666" }}>{label}{f === "QuotedPrice" && <span style={{ color: "#c00" }}> *</span>}</label>
                   <input type={type} value={form[f] || ""} onChange={e => updateNewQuote(f, e.target.value)}
-                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                    style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
                 </div>
               ))}
               <div style={{ position: "relative", zIndex: 50 }}>
@@ -253,7 +290,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
                     value={form["QuotedDate"] ? formatDateDisplay(form["QuotedDate"]) : formatDateDisplay(new Date().toISOString().split('T')[0])}
                     onClick={() => setShowCalendarByItem(c => ({ ...c, [item.ItemID]: !c[item.ItemID] }))}
                     readOnly
-                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box", cursor: "pointer", background: "#fafafa" }} />
+                    style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box", cursor: "pointer", background: "#fafafa" }} />
                   {showCalendarByItem[item.ItemID] && (
                     <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 9999, background: "white", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
                       <Calendar
@@ -273,7 +310,7 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
               <button onClick={handleAddQuote}
                 disabled={!form._vendorName?.trim() || !form.QuotedPrice}
                 title={!form._vendorName?.trim() ? "Enter a vendor name" : !form.QuotedPrice ? "Enter a quoted price" : ""}
-                style={{ background: (!form._vendorName?.trim() || !form.QuotedPrice) ? "#ccc" : "#1a7a4a", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", cursor: (!form._vendorName?.trim() || !form.QuotedPrice) ? "not-allowed" : "pointer", fontSize: 13 }}>
+                style={{ background: (!form._vendorName?.trim() || !form.QuotedPrice) ? "#ccc" : "#1a7a4a", color: "#fff", border: "none", borderRadius: 6, padding: mobile ? "8px 12px" : "6px 12px", cursor: (!form._vendorName?.trim() || !form.QuotedPrice) ? "not-allowed" : "pointer", fontSize: 13, width: mobile ? "100%" : "auto", marginTop: mobile ? 8 : 0 }}>
                 Add
               </button>
             </div>
@@ -286,39 +323,68 @@ export default function ProductDetailCard({ item, quotes: initialQuotes = [], ve
 
           {/* Quotes Table */}
           {itemQuotes.length > 0 && (
-            <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#f5f5f5" }}>
-                  {["Vendor","Price","Unit","Lead Days","Notes","Created By","Date","Best Price"].map(h => (
-                    <th key={h} style={{ textAlign: "left", padding: "6px 10px" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+            mobile ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {itemQuotes.map(q => (
-                  <tr key={q.QuoteID} style={{ background: q.IsBestPrice ? "#e6f7ee" : "transparent", borderBottom: "1px solid #eee" }}>
-                    <td style={{ padding: "6px 10px" }}>
+                  <div key={q.QuoteID} style={{ background: q.IsBestPrice ? "#e6f7ee" : "#fff", border: "1px solid #ddd", borderRadius: 6, padding: 12 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#003366", marginBottom: 8 }}>
                       {vendors.find(v => v.VendorID === q.VendorID)?.VendorName || `#${q.VendorID}`}
-                    </td>
-                    <td style={{ padding: "6px 10px", fontWeight: 600 }}>{q.Currency} {q.QuotedPrice}</td>
-                    <td style={{ padding: "6px 10px" }}>{q.PriceUnit || "—"}</td>
-                    <td style={{ padding: "6px 10px" }}>{q.LeadTimeDays || "—"}</td>
-                    <td style={{ padding: "6px 10px" }}>{q.Notes || "—"}</td>
-                    <td style={{ padding: "6px 10px" }}>{q.CreatedBy || "—"}</td>
-                    <td style={{ padding: "6px 10px" }}>{formatDate(q.QuotedDate)}</td>
-                    <td style={{ padding: "6px 10px" }}>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#555", lineHeight: 1.6, marginBottom: 10 }}>
+                      <div><b>Price:</b> {q.Currency} {q.QuotedPrice}</div>
+                      <div><b>Unit:</b> {q.PriceUnit || "—"}</div>
+                      <div><b>Lead Days:</b> {q.LeadTimeDays || "—"}</div>
+                      <div><b>Notes:</b> {q.Notes || "—"}</div>
+                      <div><b>Created By:</b> {q.CreatedBy || "—"}</div>
+                      <div><b>Date:</b> {formatDate(q.QuotedDate)}</div>
+                    </div>
+                    <div>
                       {q.IsBestPrice
-                        ? <span style={{ color: "#1a7a4a", fontWeight: 700 }}>✓ Best</span>
+                        ? <span style={{ color: "#1a7a4a", fontWeight: 700, fontSize: 12 }}>✓ Best Price</span>
                         : <button onClick={() => handleSetBest(q.QuoteID)}
-                            style={{ background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 11 }}>
-                            Set Best
+                            style={{ width: "100%", background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 5, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                            Set as Best Price
                           </button>
                       }
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            ) : (
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f5f5f5" }}>
+                    {["Vendor","Price","Unit","Lead Days","Notes","Created By","Date","Best Price"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "6px 10px" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemQuotes.map(q => (
+                    <tr key={q.QuoteID} style={{ background: q.IsBestPrice ? "#e6f7ee" : "transparent", borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "6px 10px" }}>
+                        {vendors.find(v => v.VendorID === q.VendorID)?.VendorName || `#${q.VendorID}`}
+                      </td>
+                      <td style={{ padding: "6px 10px", fontWeight: 600 }}>{q.Currency} {q.QuotedPrice}</td>
+                      <td style={{ padding: "6px 10px" }}>{q.PriceUnit || "—"}</td>
+                      <td style={{ padding: "6px 10px" }}>{q.LeadTimeDays || "—"}</td>
+                      <td style={{ padding: "6px 10px" }}>{q.Notes || "—"}</td>
+                      <td style={{ padding: "6px 10px" }}>{q.CreatedBy || "—"}</td>
+                      <td style={{ padding: "6px 10px" }}>{formatDate(q.QuotedDate)}</td>
+                      <td style={{ padding: "6px 10px" }}>
+                        {q.IsBestPrice
+                          ? <span style={{ color: "#1a7a4a", fontWeight: 700 }}>✓ Best</span>
+                          : <button onClick={() => handleSetBest(q.QuoteID)}
+                              style={{ background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 11 }}>
+                              Set Best
+                            </button>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
         </div>
       )}

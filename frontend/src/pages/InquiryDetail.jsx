@@ -11,8 +11,15 @@ export default function InquiryDetail({ id, onBack, user = null }) {
   const [sending, setSending] = useState(false);
   const [showResponse, setShowResponse] = useState(false);
   const [vendors, setVendors] = useState([]);
+  const [mobile, setMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => { load(); getVendors().then(setVendors); }, [id]);
+
+  useEffect(() => {
+    const handleResize = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -165,31 +172,33 @@ export default function InquiryDetail({ id, onBack, user = null }) {
 
   return (
     <div>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "#003366", cursor: "pointer", fontSize: 14, marginBottom: 16 }}>
-        ← Back to Inquiries
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "#003366", cursor: "pointer", fontSize: mobile ? 13 : 14, marginBottom: 16 }}>
+        ← Back
       </button>
 
       {/* Header */}
-      <div style={{ background: "#fff", borderRadius: 10, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.1)", marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-          <div>
-            <h2 style={{ margin: "0 0 6px", color: "#003366" }}>Inquiry #{id}</h2>
-            <div style={{ fontSize: 13, color: "#555" }}>
+      <div style={{ background: "#fff", borderRadius: 10, padding: mobile ? 16 : 20, boxShadow: "0 1px 4px rgba(0,0,0,0.1)", marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexDirection: mobile ? "column" : "row", gap: mobile ? 12 : 0 }}>
+          <div style={{ flex: mobile ? "1 1 100%" : "1" }}>
+            <h2 style={{ margin: "0 0 6px", color: "#003366", fontSize: mobile ? 18 : 22 }}>Inquiry #{id}</h2>
+            <div style={{ fontSize: mobile ? 12 : 13, color: "#555", lineHeight: 1.4 }}>
               <b>{Customer?.Name}</b>{Customer?.Company ? ` · ${Customer.Company}` : ""}
+              {mobile && <br />}
               {Customer?.Phone ? ` · 📞 ${Customer.Phone}` : ""}
+              {mobile && <br />}
               {Customer?.Email ? ` · ✉️ ${Customer.Email}` : ""}
             </div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
               {Source} · {formatDate(ReceivedDate)}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexDirection: mobile ? "column" : "row", width: mobile ? "100%" : "auto" }}>
             <button onClick={() => setShowResponse(true)}
-              style={{ background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+              style={{ background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: mobile ? "10px 14px" : "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600, width: mobile ? "100%" : "auto" }}>
               ✉ Send Response
             </button>
             <select value={Status} onChange={e => updateInquiryStatus(id, e.target.value).then(load)}
-              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #ccc", fontWeight: 600, color: "#003366" }}>
+              style={{ padding: mobile ? "10px 10px" : "6px 12px", borderRadius: 6, border: "1px solid #ccc", fontWeight: 600, color: "#003366", fontSize: 13, width: mobile ? "100%" : "auto", boxSizing: "border-box", cursor: "pointer" }}>
               {["New","In Progress","Quoted","Closed"].map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
@@ -218,28 +227,28 @@ export default function InquiryDetail({ id, onBack, user = null }) {
 
       {/* Send Response Modal */}
       {showResponse && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: mobile ? "flex-end" : "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => setShowResponse(false)}>
-          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 560, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+          <div style={{ background: "#fff", borderRadius: mobile ? "16px 16px 0 0" : 12, padding: mobile ? 16 : 28, width: mobile ? "100%" : 560, maxWidth: "100%", maxHeight: mobile ? "85vh" : "auto", overflowY: mobile ? "auto" : "visible", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, color: "#003366" }}>Send Response to Customer</h3>
+              <h3 style={{ margin: 0, color: "#003366", fontSize: mobile ? 16 : 18 }}>Send Response</h3>
               <button onClick={() => setShowResponse(false)}
                 style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
             </div>
             <button onClick={buildResponseTemplate}
-              style={{ background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 6, padding: "5px 14px", cursor: "pointer", fontSize: 13, marginBottom: 12 }}>
+              style={{ background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12, marginBottom: 12, width: "100%", fontWeight: 500 }}>
               Auto-fill from Best Prices
             </button>
-            <textarea value={responseText} onChange={e => setResponseText(e.target.value)} rows={10}
+            <textarea value={responseText} onChange={e => setResponseText(e.target.value)} rows={mobile ? 8 : 10}
               style={{ width: "100%", padding: 10, borderRadius: 6, border: "1px solid #ccc", fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />
-            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 14, flexDirection: mobile ? "column" : "row" }}>
               <button onClick={handleSendResponse} disabled={sending || !responseText.trim()}
-                style={{ flex: 1, background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                style={{ flex: 1, background: sending || !responseText.trim() ? "#ccc" : "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "11px", cursor: sending || !responseText.trim() ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 13 }}>
                 {sending ? "Sending…" : "Send Response"}
               </button>
               <button onClick={() => setShowResponse(false)}
-                style={{ flex: 1, background: "#eee", color: "#333", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontSize: 14 }}>
+                style={{ flex: 1, background: "#eee", color: "#333", border: "none", borderRadius: 6, padding: "11px", cursor: "pointer", fontSize: 13 }}>
                 Cancel
               </button>
             </div>

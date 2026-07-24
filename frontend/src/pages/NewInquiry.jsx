@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { parseInquiry, createCustomer, createInquiry, autocompleteCustomers } from "../api";
@@ -18,6 +18,14 @@ const inputStyle = (err) => ({
 });
 
 export default function NewInquiry({ onSaved }) {
+  const [mobile, setMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   function formatDateDisplay(dateStr) {
     if (!dateStr) return "";
     const [year, month, day] = dateStr.split('-');
@@ -193,32 +201,32 @@ export default function NewInquiry({ onSaved }) {
   }
 
   return (
-    <div style={{ background: "#fff", borderRadius: 10, padding: 24, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+    <div style={{ background: "#fff", borderRadius: 10, padding: mobile ? 16 : 24, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#003366" }}>New Inquiry</h2>
+        <h2 style={{ margin: 0, color: "#003366", fontSize: mobile ? 20 : 24 }}>New Inquiry</h2>
       </div>
 
       {/* Step 1 */}
       <div style={{ marginBottom: 4 }}>
-        <label style={{ fontWeight: 600, fontSize: 13, display: "block", marginBottom: 6 }}>
+        <label style={{ fontWeight: 600, fontSize: mobile ? 12 : 13, display: "block", marginBottom: 6 }}>
           Paste Inquiry Text <span style={{ color: "#c00" }}>*</span>
         </label>
         <textarea
           value={rawText}
           onChange={e => setRawText(e.target.value)}
           onBlur={() => touch("rawText")}
-          rows={5}
+          rows={mobile ? 4 : 5}
           placeholder={"e.g. AZITHROMYCIN 125 KG, AMOXICILLIN 50 KG\nNaveen Khaitan, Apple Formulations"}
           style={fieldStyle(textErr)}
         />
         {textErr && <div style={{ color: "#c00", fontSize: 12, marginTop: 3 }}>Inquiry text is required.</div>}
       </div>
 
-      <div style={{ display: "flex", gap: 12, margin: "14px 0 20px", alignItems: "flex-end" }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "auto auto auto", gap: 12, margin: "14px 0 20px", alignItems: "end", justifyContent: "start" }}>
         <div>
           <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Source</label>
           <select value={source} onChange={e => setSource(e.target.value)}
-            style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13 }}>
+            style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, width: "100%", boxSizing: "border-box" }}>
             {SOURCES.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
@@ -230,7 +238,7 @@ export default function NewInquiry({ onSaved }) {
             value={createdBy}
             onChange={e => { setCreatedBy(e.target.value); localStorage.setItem("createdBy", e.target.value); }}
             onBlur={() => touch("createdBy")}
-            style={{ ...inputStyle(createdErr), width: 160 }}
+            style={{ ...inputStyle(createdErr), width: mobile ? "100%" : 160 }}
           />
           {createdErr && <div style={{ color: "#c00", fontSize: 12, marginTop: 3 }}>Created by is required.</div>}
         </div>
@@ -242,26 +250,27 @@ export default function NewInquiry({ onSaved }) {
           style={{
             background: canParse ? "#003366" : "#ccc",
             color: "#fff", border: "none", borderRadius: 6,
-            padding: "8px 20px", cursor: canParse ? "pointer" : "not-allowed",
+            padding: mobile ? "10px 16px" : "8px 20px", cursor: canParse ? "pointer" : "not-allowed",
             fontWeight: 600, fontSize: 13, transition: "background 0.2s",
+            width: mobile ? "100%" : "auto", height: "fit-content"
           }}>
           {parsing ? "Parsing…" : "Parse Inquiry"}
         </button>
       </div>
 
-      {error && <div style={{ color: "#c00", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ color: "#c00", marginBottom: 12, fontSize: mobile ? 12 : 13, background: "#fff3f3", border: "1px solid #fcc", borderRadius: 6, padding: "8px 12px" }}>{error}</div>}
 
       {/* Step 2 */}
       {parsed && (
         <>
           <hr style={{ margin: "16px 0", borderColor: "#eee" }} />
-          <h3 style={{ color: "#003366", marginTop: 0 }}>Review Parsed Data</h3>
+          <h3 style={{ color: "#003366", marginTop: 0, fontSize: mobile ? 18 : 20 }}>Review Parsed Data</h3>
 
-          <div style={{ background: "#f0f6ff", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <div style={{ background: "#f0f6ff", borderRadius: 8, padding: mobile ? 12 : 16, marginBottom: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13 }}>
               Customer Details
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
               {[["customer_name","Name"],["customer_company","Company"],["customer_email","Email"],["customer_phone","Phone"]].map(([k, label]) => (
                 <div key={k} style={{ position: "relative" }}>
                   <label style={{ fontSize: 12, color: "#555" }}>{label}{k === "customer_name" && <span style={{ color: "#c00" }}> *</span>}</label>
@@ -270,7 +279,7 @@ export default function NewInquiry({ onSaved }) {
                     onChange={e => k === "customer_name" ? handleCustomerNameChange(e.target.value) : setParsed(p => ({ ...p, [k]: e.target.value }))}
                     onFocus={() => k === "customer_name" && suggestions.length > 0 && setShowSuggestions(true)}
                     onBlur={() => k === "customer_name" && setTimeout(() => setShowSuggestions(false), 150)}
-                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box",
+                    style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box",
                       border: `1px solid ${k === "customer_name" && !parsed[k]?.trim() ? "#ffaa00" : "#ccc"}` }} />
                   {k === "customer_name" && showSuggestions && suggestions.length > 0 && (
                     <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", zIndex: 10, maxHeight: 200, overflowY: "auto" }}>
@@ -278,7 +287,7 @@ export default function NewInquiry({ onSaved }) {
                         <div
                           key={idx}
                           onMouseDown={() => selectCustomerSuggestion(customer)}
-                          style={{ padding: "8px 12px", cursor: "pointer", borderBottom: idx < suggestions.length - 1 ? "1px solid #f0f0f0" : "none", fontSize: 13 }}
+                          style={{ padding: "8px 12px", cursor: "pointer", borderBottom: idx < suggestions.length - 1 ? "1px solid #f0f0f0" : "none", fontSize: 12 }}
                           onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
                           onMouseLeave={e => e.currentTarget.style.background = "#fff"}
                         >
@@ -292,25 +301,25 @@ export default function NewInquiry({ onSaved }) {
                 </div>
               ))}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               <div>
                 <label style={{ fontSize: 12, color: "#555" }}>Category</label>
                 <select value={parsed.customer_category || ""} onChange={e => setParsed(p => ({ ...p, customer_category: e.target.value }))}
-                  style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box", border: "1px solid #ccc" }}>
+                  style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box", border: "1px solid #ccc" }}>
                   <option value="">Not Identified</option>
                   {CATEGORIES.filter(c => c !== "Not Identified").map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#555" }}>Inquiry Date</label>
-                <div style={{ position: "relative" }}>
+                <div style={{ position: "relative", zIndex: 50 }}>
                   <input
                     type="text"
                     placeholder="DD/MM/YYYY"
                     value={inquiryDate}
                     onClick={() => setShowCalendar(!showCalendar)}
                     readOnly
-                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box", border: "1px solid #ccc", cursor: "pointer", background: "#fafafa" }} />
+                    style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box", border: "1px solid #ccc", cursor: "pointer", background: "#fafafa" }} />
                   {showCalendar && (
                     <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, zIndex: 1000, background: "white", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
                       <Calendar
@@ -335,9 +344,9 @@ export default function NewInquiry({ onSaved }) {
             Products <span style={{ color: "#666", fontWeight: 400 }}>({parsed.items.length})</span>
           </div>
           {parsed.items.map((item, idx) => (
-            <div key={idx} style={{ background: "#f9f9f9", borderRadius: 8, padding: 14, marginBottom: 10, border: "1px solid #e0e0e0" }}>
+            <div key={idx} style={{ background: "#f9f9f9", borderRadius: 8, padding: mobile ? 12 : 14, marginBottom: 10, border: "1px solid #e0e0e0" }}>
               <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>Item #{item.product_number || idx + 1}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 2fr auto", gap: 8, alignItems: "end" }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "2fr 1fr 1fr 1fr 2fr auto", gap: 8, alignItems: mobile ? "stretch" : "end" }}>
                 {[
                   ["product_name","Product Name","text"],
                   ["quantity","Qty","number"],
@@ -348,18 +357,18 @@ export default function NewInquiry({ onSaved }) {
                   <div key={f}>
                     <label style={{ fontSize: 11, color: "#666" }}>{label}{f === "product_name" && <span style={{ color: "#c00" }}> *</span>}</label>
                     <input type={type} value={item[f] || ""} onChange={e => updateItem(idx, f, e.target.value)}
-                      style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box",
+                      style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box",
                         border: `1px solid ${f === "product_name" && !item[f]?.trim() ? "#ffaa00" : "#ccc"}` }} />
                   </div>
                 ))}
                 <button onClick={() => removeItem(idx)}
-                  style={{ background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 5, padding: "5px 10px", cursor: "pointer", fontSize: 13 }}>✕</button>
+                  style={{ background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 5, padding: "6px 10px", cursor: "pointer", fontSize: 13, width: mobile ? "100%" : "auto", marginTop: mobile ? 4 : 0 }}>✕</button>
               </div>
             </div>
           ))}
 
           <button onClick={addItem}
-            style={{ background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 13, marginBottom: 20 }}>
+            style={{ background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 13, marginBottom: 20, width: mobile ? "100%" : "auto" }}>
             + Add Product
           </button>
 
@@ -369,7 +378,7 @@ export default function NewInquiry({ onSaved }) {
             </div>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexDirection: mobile ? "column" : "row" }}>
             <button
               onClick={handleSave}
               disabled={saving || saved}
@@ -378,6 +387,7 @@ export default function NewInquiry({ onSaved }) {
                 color: "#fff", border: "none", borderRadius: 6,
                 padding: "10px 28px", cursor: saving || saved ? "not-allowed" : "pointer",
                 fontWeight: 600, fontSize: 14, opacity: saving || saved ? 0.8 : 1,
+                width: mobile ? "100%" : "auto"
               }}>
               {saved ? "✓ Saved! Redirecting…" : saving ? "Saving…" : "Save Inquiry"}
             </button>
@@ -388,6 +398,7 @@ export default function NewInquiry({ onSaved }) {
                 background: "#f5f5f5", color: "#333", border: "1px solid #ccc", borderRadius: 6,
                 padding: "10px 24px", cursor: "pointer",
                 fontWeight: 600, fontSize: 14,
+                width: mobile ? "100%" : "auto"
               }}>
               Cancel
             </button>
@@ -398,6 +409,7 @@ export default function NewInquiry({ onSaved }) {
                 background: "#fff", color: "#666", border: "1px solid #ddd", borderRadius: 6,
                 padding: "10px 24px", cursor: "pointer",
                 fontWeight: 600, fontSize: 14,
+                width: mobile ? "100%" : "auto"
               }}>
               Clear All
             </button>

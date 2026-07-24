@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { getVendors, createVendor, updateVendor, deleteVendor, getVendorProducts, createVendorProduct, deleteVendorProduct, autocompleteProducts } from "../api";
 import { formatDate } from "../utils";
 
+const isMobile = () => window.innerWidth < 768;
+
 const VENDOR_FIELDS = [
   ["VendorName", "Vendor Name", true],
   ["ContactPerson", "Contact Person", false],
@@ -30,6 +32,13 @@ export default function VendorMaster() {
   const [createdBy, setCreatedBy] = useState(() => localStorage.getItem("createdBy") || "");
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const [mobile, setMobile] = useState(isMobile());
+
+  useEffect(() => {
+    const handleResize = () => setMobile(isMobile());
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   function handleCreatedByChange(val) {
     setCreatedBy(val);
@@ -140,79 +149,117 @@ export default function VendorMaster() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#003366" }}>Vendors</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexDirection: mobile ? "column" : "row", gap: mobile ? 12 : 0 }}>
+        <h2 style={{ margin: 0, color: "#003366", fontSize: mobile ? 20 : 24 }}>Vendors</h2>
         <button onClick={openAddModal}
-          style={{ background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+          style={{ background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: mobile ? "10px 14px" : "8px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600, width: mobile ? "100%" : "auto" }}>
           + Add Vendor
         </button>
       </div>
 
-      {/* Vendor Table */}
-      <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", marginBottom: 16 }}>
-        <thead>
-          <tr style={{ background: "#003366", color: "#fff" }}>
-            {["#", "Vendor Name", "Contact Person", "Phone", "Email", "City", "Region", "Products", "Actions"].map(h => (
-              <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 13 }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {vendors.length === 0 && (
-            <tr><td colSpan={8} style={{ padding: 24, textAlign: "center", color: "#888" }}>No vendors yet.</td></tr>
-          )}
-          {vendors.map((v, i) => (
-            <tr key={v.VendorID}
-              onClick={() => selectVendor(v)}
-              style={{
-                background: selected?.VendorID === v.VendorID ? "#e8f0fe" : i % 2 === 0 ? "#fff" : "#f9f9f9",
-                borderBottom: "1px solid #eee",
-                cursor: "pointer",
-              }}>
-              <td style={{ padding: "10px 14px", fontSize: 13, color: "#888" }}>#{v.VendorID}</td>
-              <td style={{ padding: "10px 14px", fontWeight: 600, fontSize: 13 }}>{v.VendorName}</td>
-              <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.ContactPerson || "—"}</td>
-              <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.Phone || "—"}</td>
-              <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.Email || "—"}</td>
-              <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.City || "—"}</td>
-              <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.Region || "—"}</td>
-              <td style={{ padding: "10px 14px" }}>
-                <span style={{ background: "#e8f0fe", color: "#1a56db", borderRadius: 12, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
-                  {v.ProductCount ?? 0} {(v.ProductCount ?? 0) === 1 ? "product" : "products"}
-                </span>
-              </td>
-              <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => openEditModal(v)}
-                  style={{ fontSize: 12, background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 4, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>
-                  Edit
-                </button>
-                <button onClick={() => handleDeleteVendor(v.VendorID)}
-                  style={{ fontSize: 12, background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 4, padding: "3px 10px", cursor: "pointer" }}>
-                  Remove
-                </button>
-              </td>
+      {/* Vendor Table / Cards */}
+      {!mobile ? (
+        <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", marginBottom: 16 }}>
+          <thead>
+            <tr style={{ background: "#003366", color: "#fff" }}>
+              {["#", "Vendor Name", "Contact Person", "Phone", "Email", "City", "Region", "Products", "Actions"].map(h => (
+                <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 13 }}>{h}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {vendors.length === 0 && (
+              <tr><td colSpan={8} style={{ padding: 24, textAlign: "center", color: "#888" }}>No vendors yet.</td></tr>
+            )}
+            {vendors.map((v, i) => (
+              <tr key={v.VendorID}
+                onClick={() => selectVendor(v)}
+                style={{
+                  background: selected?.VendorID === v.VendorID ? "#e8f0fe" : i % 2 === 0 ? "#fff" : "#f9f9f9",
+                  borderBottom: "1px solid #eee",
+                  cursor: "pointer",
+                }}>
+                <td style={{ padding: "10px 14px", fontSize: 13, color: "#888" }}>#{v.VendorID}</td>
+                <td style={{ padding: "10px 14px", fontWeight: 600, fontSize: 13 }}>{v.VendorName}</td>
+                <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.ContactPerson || "—"}</td>
+                <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.Phone || "—"}</td>
+                <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.Email || "—"}</td>
+                <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.City || "—"}</td>
+                <td style={{ padding: "10px 14px", fontSize: 13 }}>{v.Region || "—"}</td>
+                <td style={{ padding: "10px 14px" }}>
+                  <span style={{ background: "#e8f0fe", color: "#1a56db", borderRadius: 12, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
+                    {v.ProductCount ?? 0} {(v.ProductCount ?? 0) === 1 ? "product" : "products"}
+                  </span>
+                </td>
+                <td style={{ padding: "10px 14px" }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => openEditModal(v)}
+                    style={{ fontSize: 12, background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 4, padding: "3px 10px", cursor: "pointer", marginRight: 6 }}>
+                    Edit
+                  </button>
+                  <button onClick={() => handleDeleteVendor(v.VendorID)}
+                    style={{ fontSize: 12, background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 4, padding: "3px 10px", cursor: "pointer" }}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+          {vendors.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#888", padding: 24, background: "#fff", borderRadius: 8 }}>No vendors yet.</div>
+          ) : (
+            vendors.map(v => (
+              <div key={v.VendorID}
+                onClick={() => selectVendor(v)}
+                style={{ background: selected?.VendorID === v.VendorID ? "#e8f0fe" : "#fff", border: "1px solid #e0e0e0", borderRadius: 8, padding: 12, cursor: "pointer" }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#003366", marginBottom: 8 }}>{v.VendorName}</div>
+                <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 10 }}>
+                  {v.ContactPerson && <div><b>Contact:</b> {v.ContactPerson}</div>}
+                  {v.Phone && <div><b>Phone:</b> {v.Phone}</div>}
+                  {v.Email && <div><b>Email:</b> {v.Email}</div>}
+                  {v.City && <div><b>City:</b> {v.City}</div>}
+                  {v.Region && <div><b>Region:</b> {v.Region}</div>}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <span style={{ background: "#e8f0fe", color: "#1a56db", borderRadius: 12, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>
+                    {v.ProductCount ?? 0} product{(v.ProductCount ?? 0) !== 1 ? "s" : ""}
+                  </span>
+                  <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openEditModal(v)}
+                      style={{ fontSize: 11, background: "#eef4ff", color: "#003366", border: "1px solid #aac4ee", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}>
+                      Edit
+                    </button>
+                    <button onClick={() => handleDeleteVendor(v.VendorID)}
+                      style={{ fontSize: 11, background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Products Modal */}
       {selected && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: mobile ? "flex-end" : "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => { setSelected(null); setProducts([]); }}>
-          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 760, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+          <div style={{ background: "#fff", borderRadius: mobile ? "16px 16px 0 0" : 12, padding: mobile ? 16 : 28, width: mobile ? "100%" : 760, maxHeight: mobile ? "85vh" : "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
             onClick={e => e.stopPropagation()}>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, color: "#003366" }}>Products — {selected.VendorName}</h3>
+              <h3 style={{ margin: 0, color: "#003366", fontSize: mobile ? 16 : 18 }}>Products — {selected.VendorName}</h3>
               <button onClick={() => { setSelected(null); setProducts([]); }}
                 style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
             </div>
 
             {/* Add product form */}
-            <div style={{ background: "#f0f6ff", borderRadius: 8, padding: 12, marginBottom: 16, flexShrink: 0 }}>
+            <div style={{ background: "#f0f6ff", borderRadius: 8, padding: mobile ? 10 : 12, marginBottom: 16, flexShrink: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8, color: "#003366" }}>Add Product</div>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 2fr 1fr 2fr auto", gap: 8, alignItems: "end", marginBottom: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "2fr 1fr 2fr 1fr 2fr auto", gap: 8, alignItems: "end", marginBottom: 8 }}>
                 {PRODUCT_FIELDS.map(([f, label]) => (
                   <div key={f} style={{ position: "relative" }}>
                     <label style={{ fontSize: 11, color: "#555" }}>{label}</label>
@@ -240,71 +287,97 @@ export default function VendorMaster() {
                   </div>
                 ))}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr 1fr 1fr auto", gap: 8, alignItems: "end" }}>
                 {[["ReferencePrice","Price","number"],["ReferenceCurrency","Currency","text"],["ReferencePriceUnit","Price Unit","text"]].map(([f, label, type]) => (
                   <div key={f}>
                     <label style={{ fontSize: 11, color: "#555" }}>{label}</label>
                     <input type={type} value={productForm[f] || ""} onChange={e => setProductForm(p => ({ ...p, [f]: e.target.value }))}
-                      style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                      style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
                   </div>
                 ))}
                 <div>
                   <label style={{ fontSize: 11, color: "#555" }}>Price Date</label>
                   <input type="date" value={productForm["ReferencePriceDate"] || ""} onChange={e => setProductForm(p => ({ ...p, ReferencePriceDate: e.target.value }))}
-                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                    style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, color: "#555" }}>Created By</label>
                   <input value={createdBy} onChange={e => handleCreatedByChange(e.target.value)}
                     placeholder="Your name…"
-                    style={{ display: "block", width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
+                    style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
                 </div>
                 <button onClick={handleAddProduct}
-                  style={{ background: "#1a7a4a", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 13 }}>
+                  style={{ background: "#1a7a4a", color: "#fff", border: "none", borderRadius: 6, padding: mobile ? "8px 12px" : "6px 14px", cursor: "pointer", fontSize: 13, width: mobile ? "100%" : "auto", marginTop: mobile ? 4 : 0 }}>
                   Add
                 </button>
               </div>
             </div>
 
-            {/* Products table (scrollable) */}
-            <div style={{ overflowY: "auto" }}>
-              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ background: "#f5f5f5" }}>
-                    {["Product Name", "Grade", "Manufacturer", "Lead Days", "Last Price", "Quoted On", "Notes", ""].map(h => (
-                      <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, fontSize: 12, position: "sticky", top: 0, background: "#f5f5f5" }}>{h}</th>
+            {/* Products table (scrollable) / Cards (mobile) */}
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {!mobile ? (
+                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f5f5f5" }}>
+                      {["Product Name", "Grade", "Manufacturer", "Lead Days", "Last Price", "Quoted On", "Notes", ""].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, fontSize: 12, position: "sticky", top: 0, background: "#f5f5f5" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.length === 0 && (
+                      <tr><td colSpan={8} style={{ padding: 20, color: "#888", textAlign: "center" }}>No products yet.</td></tr>
+                    )}
+                    {products.map(p => (
+                      <tr key={p.VendorProductID} style={{ borderBottom: "1px solid #eee" }}>
+                        <td style={{ padding: "8px 10px", fontWeight: 600 }}>{p.ProductName}</td>
+                        <td style={{ padding: "8px 10px" }}>{p.Grade || "—"}</td>
+                        <td style={{ padding: "8px 10px" }}>{p.Manufacturer || "—"}</td>
+                        <td style={{ padding: "8px 10px" }}>{p.LeadTimeDays || "—"}</td>
+                        <td style={{ padding: "8px 10px", fontWeight: 600, color: "#1a7a4a" }}>
+                          {p.LastQuotedPrice
+                            ? `${p.LastCurrency || "INR"} ${p.LastQuotedPrice}${p.LastPriceUnit ? " / " + p.LastPriceUnit : ""}`
+                            : "—"}
+                        </td>
+                        <td style={{ padding: "8px 10px", color: "#666" }}>
+                          {formatDate(p.LastQuotedDate)}
+                        </td>
+                        <td style={{ padding: "8px 10px" }}>{p.Notes || "—"}</td>
+                        <td style={{ padding: "8px 10px" }}>
+                          <button onClick={() => handleDeleteProduct(p.VendorProductID)}
+                            style={{ background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 12 }}>
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.length === 0 && (
-                    <tr><td colSpan={8} style={{ padding: 20, color: "#888", textAlign: "center" }}>No products yet.</td></tr>
-                  )}
-                  {products.map(p => (
-                    <tr key={p.VendorProductID} style={{ borderBottom: "1px solid #eee" }}>
-                      <td style={{ padding: "8px 10px", fontWeight: 600 }}>{p.ProductName}</td>
-                      <td style={{ padding: "8px 10px" }}>{p.Grade || "—"}</td>
-                      <td style={{ padding: "8px 10px" }}>{p.Manufacturer || "—"}</td>
-                      <td style={{ padding: "8px 10px" }}>{p.LeadTimeDays || "—"}</td>
-                      <td style={{ padding: "8px 10px", fontWeight: 600, color: "#1a7a4a" }}>
-                        {p.LastQuotedPrice
-                          ? `${p.LastCurrency || "INR"} ${p.LastQuotedPrice}${p.LastPriceUnit ? " / " + p.LastPriceUnit : ""}`
-                          : "—"}
-                      </td>
-                      <td style={{ padding: "8px 10px", color: "#666" }}>
-                        {formatDate(p.LastQuotedDate)}
-                      </td>
-                      <td style={{ padding: "8px 10px" }}>{p.Notes || "—"}</td>
-                      <td style={{ padding: "8px 10px" }}>
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {products.length === 0 ? (
+                    <div style={{ padding: 20, color: "#888", textAlign: "center" }}>No products yet.</div>
+                  ) : (
+                    products.map(p => (
+                      <div key={p.VendorProductID} style={{ background: "#f9f9f9", border: "1px solid #e0e0e0", borderRadius: 6, padding: 10 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "#003366", marginBottom: 8 }}>{p.ProductName}</div>
+                        <div style={{ fontSize: 11, color: "#555", lineHeight: 1.6, marginBottom: 10 }}>
+                          {p.Grade && <div><b>Grade:</b> {p.Grade}</div>}
+                          {p.Manufacturer && <div><b>Manufacturer:</b> {p.Manufacturer}</div>}
+                          {p.LeadTimeDays && <div><b>Lead Days:</b> {p.LeadTimeDays}</div>}
+                          {p.LastQuotedPrice && <div><b>Last Price:</b> {p.LastCurrency || "INR"} {p.LastQuotedPrice}{p.LastPriceUnit ? " / " + p.LastPriceUnit : ""}</div>}
+                          {p.LastQuotedDate && <div><b>Quoted On:</b> {formatDate(p.LastQuotedDate)}</div>}
+                          {p.Notes && <div><b>Notes:</b> {p.Notes}</div>}
+                        </div>
                         <button onClick={() => handleDeleteProduct(p.VendorProductID)}
-                          style={{ background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 5, padding: "3px 10px", cursor: "pointer", fontSize: 12 }}>
+                          style={{ width: "100%", background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 5, padding: "6px 10px", cursor: "pointer", fontSize: 11 }}>
                           Remove
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -312,12 +385,12 @@ export default function VendorMaster() {
 
       {/* Add / Edit Modal */}
       {showModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: mobile ? "flex-end" : "center", justifyContent: "center", zIndex: 1000 }}
           onClick={closeModal}>
-          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+          <div style={{ background: "#fff", borderRadius: mobile ? "16px 16px 0 0" : 12, padding: mobile ? 16 : 28, width: mobile ? "100%" : 420, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ margin: 0, color: "#003366" }}>{editingId ? "Edit Vendor" : "Add Vendor"}</h3>
+              <h3 style={{ margin: 0, color: "#003366", fontSize: mobile ? 16 : 18 }}>{editingId ? "Edit Vendor" : "Add Vendor"}</h3>
               <button onClick={closeModal} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888" }}>✕</button>
             </div>
             {VENDOR_FIELDS.map(([f, label, required]) => (
@@ -337,7 +410,7 @@ export default function VendorMaster() {
                   style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, boxSizing: "border-box" }} />
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 20, flexDirection: mobile ? "column" : "row" }}>
               <button onClick={handleSaveVendor}
                 style={{ flex: 1, background: "#003366", color: "#fff", border: "none", borderRadius: 6, padding: "10px", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>
                 {editingId ? "Update" : "Add Vendor"}

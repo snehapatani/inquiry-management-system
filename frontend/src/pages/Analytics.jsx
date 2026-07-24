@@ -27,6 +27,13 @@ export default function Analytics() {
   const [quotedProductCount, setQuotedProductCount] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [mobile, setMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => { fetchAnalyticsData(); }, [timePeriod, customStartDate, customEndDate, filterStatus, filterCreatedBy]);
 
@@ -180,37 +187,37 @@ export default function Analytics() {
     <div style={{
       background: "#fff",
       borderRadius: 10,
-      padding: 20,
+      padding: mobile ? 14 : 20,
       boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
       border: `3px solid ${color}`,
-      flex: "1 1 auto",
+      flex: mobile ? "1 1 100%" : "1 1 auto",
       minWidth: 0,
     }}>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 8, fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 700, color: color, marginBottom: 6 }}>{value}</div>
-      {trend && <div style={{ fontSize: 11, color: "#666" }}>{trend}</div>}
+      <div style={{ fontSize: 11, color: "#888", marginBottom: 6, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: mobile ? 24 : 32, fontWeight: 700, color: color, marginBottom: 4 }}>{value}</div>
+      {trend && <div style={{ fontSize: 10, color: "#666" }}>{trend}</div>}
     </div>
   );
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h2 style={{ margin: 0, color: "#003366" }}>Analytics Dashboard</h2>
+        <h2 style={{ margin: 0, color: "#003366", fontSize: mobile ? 20 : 24 }}>Analytics Dashboard</h2>
       </div>
 
       {/* Filters */}
       <div style={{
         background: "#fff",
         borderRadius: 10,
-        padding: 16,
+        padding: mobile ? 12 : 16,
         marginBottom: 20,
         boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
       }}>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div>
+        <div style={{ display: "flex", gap: 12, flexWrap: mobile ? "wrap" : "nowrap", alignItems: "flex-end", flexDirection: mobile ? "column" : "row" }}>
+          <div style={{ width: mobile ? "100%" : "auto" }}>
             <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 600 }}>Time Period</label>
             <select value={timePeriod} onChange={e => setTimePeriod(e.target.value)}
-              style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13 }}>
+              style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, width: mobile ? "100%" : "auto", boxSizing: "border-box" }}>
               {Object.entries(TIME_PERIODS).map(([key, { label }]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
@@ -219,23 +226,23 @@ export default function Analytics() {
 
           {timePeriod === "custom" && (
             <>
-              <div>
+              <div style={{ width: mobile ? "100%" : "auto" }}>
                 <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 600 }}>Start Date</label>
                 <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)}
-                  style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13 }} />
+                  style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, width: mobile ? "100%" : "auto", boxSizing: "border-box" }} />
               </div>
-              <div>
+              <div style={{ width: mobile ? "100%" : "auto" }}>
                 <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 600 }}>End Date</label>
                 <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)}
-                  style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13 }} />
+                  style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, width: mobile ? "100%" : "auto", boxSizing: "border-box" }} />
               </div>
             </>
           )}
 
-          <div>
+          <div style={{ width: mobile ? "100%" : "auto" }}>
             <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 600 }}>Status</label>
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13 }}>
+              style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, width: mobile ? "100%" : "auto", boxSizing: "border-box" }}>
               <option value="">All Status</option>
               <option>New</option>
               <option>In Progress</option>
@@ -244,10 +251,10 @@ export default function Analytics() {
             </select>
           </div>
 
-          <div>
+          <div style={{ width: mobile ? "100%" : "auto" }}>
             <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 600 }}>Created By</label>
             <select value={filterCreatedBy} onChange={e => setFilterCreatedBy(e.target.value)}
-              style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13 }}>
+              style={{ padding: "7px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: 13, width: mobile ? "100%" : "auto", boxSizing: "border-box" }}>
               <option value="">All Users</option>
               {createdByList.map(user => (
                 <option key={user} value={user}>{user}</option>
@@ -262,7 +269,7 @@ export default function Analytics() {
       ) : (
         <>
           {/* KPI Cards */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "nowrap" }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: mobile ? "wrap" : "nowrap" }}>
             <KPICard label="Total Inquiries" value={totalInquiries} color="#003366" />
             <KPICard label="Total Products" value={totalProducts} color="#1a7a4a" />
             <KPICard label="Products Quoted" value={quotedProductCount} color="#1a56db" />
@@ -273,12 +280,12 @@ export default function Analytics() {
           <div style={{
             background: "#fff",
             borderRadius: 10,
-            padding: 20,
+            padding: mobile ? 14 : 20,
             marginBottom: 20,
             boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
           }}>
-            <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: 16 }}>Inquiries by Status</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: mobile ? 14 : 16 }}>Inquiries by Status</h3>
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 12 }}>
               {[
                 { label: "New", value: statusCounts.New, color: "#e8f4fd" },
                 { label: "In Progress", value: statusCounts["In Progress"], color: "#fff7e6" },
@@ -299,15 +306,15 @@ export default function Analytics() {
           </div>
 
           {/* Charts Section */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 20, marginBottom: 20 }}>
             {/* Inquiries by Status - Bar Chart */}
             <div style={{
               background: "#fff",
               borderRadius: 10,
-              padding: 20,
+              padding: mobile ? 14 : 20,
               boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
             }}>
-              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: 16 }}>Inquiries by Status</h3>
+              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: mobile ? 14 : 16 }}>Inquiries by Status</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={statusChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -323,10 +330,10 @@ export default function Analytics() {
             <div style={{
               background: "#fff",
               borderRadius: 10,
-              padding: 20,
+              padding: mobile ? 14 : 20,
               boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
             }}>
-              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: 16 }}>Inquiries by Source</h3>
+              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: mobile ? 14 : 16 }}>Inquiries by Source</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -352,11 +359,11 @@ export default function Analytics() {
             <div style={{
               background: "#fff",
               borderRadius: 10,
-              padding: 20,
+              padding: mobile ? 14 : 20,
               boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-              gridColumn: "1 / -1",
+              gridColumn: mobile ? "1" : "1 / -1",
             }}>
-              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: 16 }}>Inquiries Over Time</h3>
+              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: mobile ? 14 : 16 }}>Inquiries Over Time</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={inquiriesByDateData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -373,10 +380,10 @@ export default function Analytics() {
             <div style={{
               background: "#fff",
               borderRadius: 10,
-              padding: 20,
+              padding: mobile ? 14 : 20,
               boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
             }}>
-              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: 16 }}>Top Creators</h3>
+              <h3 style={{ margin: "0 0 16px", color: "#003366", fontSize: mobile ? 14 : 16 }}>Top Creators</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={createdByChartData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" />
