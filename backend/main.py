@@ -193,12 +193,57 @@ def delete_user(user_id: int, current_user: models.User = Depends(require_admin)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+# ── Protected: User Preferences ───────────────────────────────
+@priv.get("/preferences/{key}")
+def get_preference(key: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get user preference by key"""
+    pref = db.query(models.UserPreference).filter(
+        models.UserPreference.UserID == current_user.UserID,
+        models.UserPreference.PreferenceKey == key
+    ).first()
+    if not pref:
+        return {"value": None}
+    return {"value": pref.PreferenceValue}
+
+@priv.post("/preferences/{key}")
+def save_preference(key: str, data: dict, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Save or update user preference"""
+    import json
+    value = json.dumps(data.get("value", ""))
+
+    pref = db.query(models.UserPreference).filter(
+        models.UserPreference.UserID == current_user.UserID,
+        models.UserPreference.PreferenceKey == key
+    ).first()
+
+    if pref:
+        pref.PreferenceValue = value
+    else:
+        pref = models.UserPreference(
+            UserID=current_user.UserID,
+            PreferenceKey=key,
+            PreferenceValue=value
+        )
+        db.add(pref)
+
+    db.commit()
+    return {"ok": True}
+
+
 # ── Protected: LLM Parser ─────────────────────────────────────
 @priv.post("/parse", response_model=schemas.ParsedInquiry)
-def parse(req: schemas.ParseRequest, current_user: models.User = Depends(get_current_user)):
+def parse(req: schemas.ParseRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         logger.info(f"User {current_user.Username} parsing inquiry (text length: {len(req.raw_text)})")
         result = parse_inquiry(req.raw_text)
+
+        # Add product suggestions via smart parser
+        from inquiry_parser import get_product_suggestions
+        for item in result.items:
+            if item.product_name:
+                suggestions = get_product_suggestions(item.product_name, db=db)
+                item.suggestions = suggestions
+
         logger.info(f"Inquiry parsed successfully by {current_user.Username}")
         return result
     except Exception as e:
@@ -245,6 +290,18 @@ def autocomplete_products(q: str = Query(""), db: Session = Depends(get_db)):
         models.InquiryItem.ProductNameRaw.ilike(f"%{query}%")
     ).distinct().limit(10).all()
     return [{"ProductName": p[0]} for p in products if p[0]]
+
+@priv.get("/companies/autocomplete")
+def autocomplete_companies(q: str = Query(""), db: Session = Depends(get_db)):
+    query = q.strip().lower()
+    if not query:
+        return []
+    companies = db.query(models.Customer.Company).filter(
+        models.Customer.IsActive == 1,
+        models.Customer.Company.ilike(f"%{query}%"),
+        models.Customer.Company != ""
+    ).distinct().limit(10).all()
+    return [{"Company": c[0]} for c in companies if c[0]]
 
 @priv.get("/customers/{customer_id}", response_model=schemas.CustomerOut)
 def get_customer(customer_id: int, db: Session = Depends(get_db)):
@@ -467,6 +524,7 @@ def list_vendors(db: Session = Depends(get_db)):
             models.Vendor.CreatedBy,
             models.Vendor.CreatedAt,
         )
+        .order_by(models.Vendor.CreatedAt.desc())
         .all()
     )
     result = []
@@ -545,6 +603,103 @@ def get_vendor_products(vendor_id: int, db: Session = Depends(get_db)):
             out.LastPriceUnit = p.ReferencePriceUnit
             out.LastCurrency = p.ReferenceCurrency
         result.append(out)
+    return result
+
+@priv.get("/products/search-vendors")
+def search_products_in_vendors(q: str = Query(""), db: Session = Depends(get_db)):
+    """Search for products across all vendors. Returns vendors that have matching products with pricing info."""
+    query = q.strip().lower()
+    if not query:
+        return []
+
+    # Find all VendorProducts matching the search query
+    matching_products = db.query(models.VendorProduct).filter(
+        models.VendorProduct.ProductName.ilike(f"%{query}%")
+    ).all()
+
+    if not matching_products:
+        return []
+
+    # Group by VendorID and get vendor info
+    vendor_ids = set(p.VendorID for p in matching_products)
+    vendors = db.query(models.Vendor).filter(
+        models.Vendor.VendorID.in_(vendor_ids),
+        models.Vendor.IsActive == 1
+    ).all()
+
+    # Get recent quote data for pricing - subquery for each vendor
+    def get_recent_quotes_for_vendor(vendor_id: int):
+        sq = (
+            db.query(
+                models.InquiryItem.ProductNameNorm.label("pname"),
+                func.max(models.VendorQuote.QuotedDate).label("max_date"),
+            )
+            .join(models.VendorQuote, models.VendorQuote.ItemID == models.InquiryItem.ItemID)
+            .filter(models.VendorQuote.VendorID == vendor_id)
+            .group_by(models.InquiryItem.ProductNameNorm)
+            .subquery()
+        )
+        recent = (
+            db.query(models.VendorQuote, models.InquiryItem.ProductNameNorm.label("pname"))
+            .join(models.InquiryItem, models.VendorQuote.ItemID == models.InquiryItem.ItemID)
+            .join(sq, and_(
+                models.InquiryItem.ProductNameNorm == sq.c.pname,
+                models.VendorQuote.QuotedDate == sq.c.max_date,
+            ))
+            .filter(models.VendorQuote.VendorID == vendor_id)
+            .all()
+        )
+        return {pname: q for q, pname in recent}
+
+    # Build response with vendor info and their matching products with pricing
+    result = []
+    for vendor in vendors:
+        vendor_products = [p for p in matching_products if p.VendorID == vendor.VendorID]
+        quote_map = get_recent_quotes_for_vendor(vendor.VendorID)
+
+        matching_products_data = []
+        for p in vendor_products:
+            product_data = {
+                "VendorProductID": p.VendorProductID,
+                "ProductName": p.ProductName,
+                "Grade": p.Grade,
+                "Manufacturer": p.Manufacturer,
+                "LeadTimeDays": p.LeadTimeDays,
+                "LastQuotedPrice": None,
+                "LastQuotedDate": None,
+                "LastPriceUnit": None,
+                "LastCurrency": None,
+            }
+
+            # Try to get recent quote first
+            q = quote_map.get(p.ProductName)
+            if q:
+                product_data["LastQuotedPrice"] = q.QuotedPrice
+                product_data["LastQuotedDate"] = q.QuotedDate
+                product_data["LastPriceUnit"] = q.PriceUnit
+                product_data["LastCurrency"] = q.Currency
+            # Fall back to reference price
+            elif p.ReferencePrice:
+                product_data["LastQuotedPrice"] = p.ReferencePrice
+                product_data["LastQuotedDate"] = p.ReferencePriceDate
+                product_data["LastPriceUnit"] = p.ReferencePriceUnit
+                product_data["LastCurrency"] = p.ReferenceCurrency
+
+            matching_products_data.append(product_data)
+
+        vendor_data = {
+            "VendorID": vendor.VendorID,
+            "VendorName": vendor.VendorName,
+            "ContactPerson": vendor.ContactPerson,
+            "Phone": vendor.Phone,
+            "Email": vendor.Email,
+            "City": vendor.City,
+            "Region": vendor.Region,
+            "ProductCount": len(vendor_products),
+            "MatchingProducts": matching_products_data
+        }
+        result.append(vendor_data)
+
     return result
 
 @priv.post("/vendor-products", response_model=schemas.VendorProductOut)

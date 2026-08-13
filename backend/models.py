@@ -117,3 +117,12 @@ class SentResponse(Base):
     MessageBody = Column(Text)
     SentBy      = Column(String(100))
     Status      = Column(String(30), default="Sent")
+
+
+class UserPreference(Base):
+    __tablename__ = "UserPreferences"
+    PreferenceID = Column(Integer, primary_key=True, autoincrement=True)
+    UserID       = Column(Integer, ForeignKey("Users.UserID"), nullable=False)
+    PreferenceKey = Column(String(100), nullable=False)  # e.g., "vendor_columns"
+    PreferenceValue = Column(Text, nullable=False)  # JSON string
+    UpdatedAt    = Column(DateTime, default=func.now(), onupdate=func.now())

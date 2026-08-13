@@ -47,6 +47,8 @@ out/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+backend/logs/
+logs/
 
 # Dependencies cache
 .eslintcache
@@ -70,6 +72,13 @@ frontend/e2e/
 # Word documents
 *.docx
 *.doc
+
+# Launcher scripts and executables
+*.bat
+*.exe
+launcher.py
+start_ims.py
+IMS-Launcher.spec
 
 # Temporary/generated files
 ~$*

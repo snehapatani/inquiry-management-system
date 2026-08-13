@@ -4,10 +4,12 @@ Falls back to a regex-based mock parser when no API key is configured.
 """
 import re
 import json
-from typing import Optional
+from typing import Optional, List
 import anthropic
 from database import settings
-from schemas import ParsedInquiry, ParsedItem
+from schemas import ParsedInquiry, ParsedItem, ProductSuggestion
+from fuzzywuzzy import fuzz
+from sqlalchemy.orm import Session
 
 # ── mock parser ───────────────────────────────────────────────
 _QTY_RE  = re.compile(r"(\d[\d,\.]*)\s*(KG|KGS|MT|MTS|GM|GMS|LT|LIT|G|L)\b", re.I)
@@ -333,6 +335,37 @@ Return JSON in this exact format:
     }
   ]
 }"""
+
+
+def get_product_suggestions(product_name: str, db: Optional[Session] = None, min_similarity: int = 70, max_suggestions: int = 3) -> List[ProductSuggestion]:
+    """Find similar product names from the database using fuzzy matching."""
+    if not product_name or not db:
+        return []
+
+    try:
+        from models import InquiryItem
+        # Get all distinct product names from database
+        existing_products = db.query(InquiryItem.ProductNameRaw).distinct().all()
+        existing_names = [p[0] for p in existing_products if p[0]]
+
+        # Calculate similarity scores
+        similarities = []
+        for existing_name in existing_names:
+            # Use token_set_ratio for better handling of reordered words
+            score = fuzz.token_set_ratio(product_name.lower(), existing_name.lower())
+            if score >= min_similarity:
+                similarities.append((existing_name, score))
+
+        # Sort by score descending and return top suggestions
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        suggestions = [
+            ProductSuggestion(name=name, confidence=score)
+            for name, score in similarities[:max_suggestions]
+        ]
+        return suggestions
+    except Exception as e:
+        # If there's any error, just return empty suggestions
+        return []
 
 
 def parse_inquiry(raw_text: str) -> ParsedInquiry:

@@ -69,9 +69,11 @@ export const getParseMode  = () => req("/parse/mode");
 export const getCustomers  = () => req("/customers");
 export const createCustomer = (data) => req("/customers", { method: "POST", body: JSON.stringify(data) });
 export const autocompleteCustomers = (q) => req(`/customers/autocomplete?q=${encodeURIComponent(q)}`);
+export const autocompleteCompanies = (q) => req(`/companies/autocomplete?q=${encodeURIComponent(q)}`);
 
 // Products
 export const autocompleteProducts = (q) => req(`/products/autocomplete?q=${encodeURIComponent(q)}`);
+export const searchProductsInVendors = (q) => req(`/products/search-vendors?q=${encodeURIComponent(q)}`);
 
 // Inquiries
 export const getInquiries  = (params = {}) => {
@@ -116,3 +118,7 @@ export const updateQuote  = (id, data) => req(`/quotes/${id}`, { method: "PUT", 
 export const sendResponse     = (data) => req("/responses", { method: "POST", body: JSON.stringify(data) });
 export const getResponses     = (inquiryId) => req(`/inquiries/${inquiryId}/responses`);
 export const getAllResponses   = () => req("/responses");
+
+// User Preferences
+export const getPreference = (key) => req(`/preferences/${key}`);
+export const savePreference = (key, value) => req(`/preferences/${key}`, { method: "POST", body: JSON.stringify({ value }) });

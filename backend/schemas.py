@@ -188,6 +188,10 @@ class SentResponseLog(SentResponseOut):
 class ParseRequest(BaseModel):
     raw_text: str
 
+class ProductSuggestion(BaseModel):
+    name: str
+    confidence: int  # 0-100 similarity score
+
 class ParsedItem(BaseModel):
     product_number: int  # Sequential product count (1, 2, 3, ...)
     product_name: str
@@ -195,6 +199,7 @@ class ParsedItem(BaseModel):
     unit: Optional[str] = None
     grade: Optional[str] = None
     manufacturer_pref: Optional[str] = None
+    suggestions: List[ProductSuggestion] = []  # Smart parser suggestions
 
 class ParsedInquiry(BaseModel):
     customer_name: Optional[str] = None
@@ -205,6 +210,10 @@ class ParsedInquiry(BaseModel):
 
 
 # ── Vendor Match ──────────────────────────────────────────────
+class UserPreference(BaseModel):
+    PreferenceKey: str
+    PreferenceValue: str
+
 class VendorMatch(BaseModel):
     VendorProductID: int
     VendorID: int

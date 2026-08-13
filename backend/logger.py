@@ -65,9 +65,12 @@ def cleanup_old_logs():
             file_time = datetime.fromtimestamp(os.path.getctime(log_file))
             if file_time < cutoff_time:
                 os.remove(log_file)
-                logger.info(f"Deleted old log file: {log_file}")
-        except Exception as e:
-            logger.error(f"Error deleting log file {log_file}: {e}")
+        except PermissionError:
+            # File is currently in use by logger, skip it
+            pass
+        except OSError:
+            # Other file system errors, skip silently
+            pass
 
 
 # Clean up old logs on startup

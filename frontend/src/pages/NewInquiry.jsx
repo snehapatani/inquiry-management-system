@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import { parseInquiry, createCustomer, createInquiry, autocompleteCustomers } from "../api";
+import { parseInquiry, createCustomer, createInquiry, autocompleteCustomers, autocompleteCompanies } from "../api";
 
 const SOURCES = ["WhatsApp", "Email", "Phone", "Other"];
 const CATEGORIES = ["End User", "Trader", "Distributor", "Not Identified"];
@@ -59,6 +59,9 @@ export default function NewInquiry({ onSaved }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [companySuggestions, setCompanySuggestions] = useState([]);
+  const [showCompanySuggestions, setShowCompanySuggestions] = useState(false);
+  const [loadingCompanySuggestions, setLoadingCompanySuggestions] = useState(false);
 
   const textErr    = touched.rawText   && !rawText.trim();
   const createdErr = touched.createdBy && !createdBy.trim();
@@ -147,6 +150,31 @@ export default function NewInquiry({ onSaved }) {
     }));
     setSuggestions([]);
     setShowSuggestions(false);
+  }
+
+  async function handleCompanyChange(value) {
+    setParsed(p => ({ ...p, customer_company: value }));
+    if (value.trim().length < 2) {
+      setCompanySuggestions([]);
+      setShowCompanySuggestions(false);
+      return;
+    }
+    setLoadingCompanySuggestions(true);
+    try {
+      const results = await autocompleteCompanies(value);
+      setCompanySuggestions(results);
+      setShowCompanySuggestions(results.length > 0);
+    } catch (e) {
+      setCompanySuggestions([]);
+    } finally {
+      setLoadingCompanySuggestions(false);
+    }
+  }
+
+  function selectCompanySuggestion(company) {
+    setParsed(p => ({ ...p, customer_company: company.Company }));
+    setCompanySuggestions([]);
+    setShowCompanySuggestions(false);
   }
 
   function validateBeforeSave() {
@@ -276,13 +304,19 @@ export default function NewInquiry({ onSaved }) {
                   <label style={{ fontSize: 12, color: "#555" }}>{label}{k === "customer_name" && <span style={{ color: "#c00" }}> *</span>}</label>
                   <input
                     value={parsed[k] || ""}
-                    onChange={e => k === "customer_name" ? handleCustomerNameChange(e.target.value) : setParsed(p => ({ ...p, [k]: e.target.value }))}
-                    onFocus={() => k === "customer_name" && suggestions.length > 0 && setShowSuggestions(true)}
-                    onBlur={() => k === "customer_name" && setTimeout(() => setShowSuggestions(false), 150)}
+                    onChange={e => k === "customer_name" ? handleCustomerNameChange(e.target.value) : k === "customer_company" ? handleCompanyChange(e.target.value) : setParsed(p => ({ ...p, [k]: e.target.value }))}
+                    onFocus={() => {
+                      if (k === "customer_name" && suggestions.length > 0) setShowSuggestions(true);
+                      if (k === "customer_company" && companySuggestions.length > 0) setShowCompanySuggestions(true);
+                    }}
+                    onBlur={() => {
+                      if (k === "customer_name") setTimeout(() => setShowSuggestions(false), 150);
+                      if (k === "customer_company") setTimeout(() => setShowCompanySuggestions(false), 150);
+                    }}
                     style={{ display: "block", width: "100%", padding: "6px 8px", borderRadius: 5, fontSize: 13, boxSizing: "border-box",
                       border: `1px solid ${k === "customer_name" && !parsed[k]?.trim() ? "#ffaa00" : "#ccc"}` }} />
                   {k === "customer_name" && showSuggestions && suggestions.length > 0 && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", zIndex: 10, maxHeight: 200, overflowY: "auto" }}>
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", zIndex: 100, maxHeight: 200, overflowY: "auto" }}>
                       {suggestions.map((customer, idx) => (
                         <div
                           key={idx}
@@ -294,6 +328,21 @@ export default function NewInquiry({ onSaved }) {
                           <div style={{ fontWeight: 600, color: "#003366" }}>{customer.Name}</div>
                           {customer.Company && <div style={{ fontSize: 11, color: "#888" }}>{customer.Company}</div>}
                           {customer.Email && <div style={{ fontSize: 11, color: "#888" }}>{customer.Email}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {k === "customer_company" && showCompanySuggestions && companySuggestions.length > 0 && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1px solid #ccc", borderRadius: 5, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", zIndex: 100, maxHeight: 200, overflowY: "auto" }}>
+                      {companySuggestions.map((company, idx) => (
+                        <div
+                          key={idx}
+                          onMouseDown={() => selectCompanySuggestion(company)}
+                          style={{ padding: "8px 12px", cursor: "pointer", borderBottom: idx < companySuggestions.length - 1 ? "1px solid #f0f0f0" : "none", fontSize: 12 }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+                          onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+                        >
+                          <div style={{ color: "#003366" }}>{company.Company}</div>
                         </div>
                       ))}
                     </div>
@@ -364,6 +413,42 @@ export default function NewInquiry({ onSaved }) {
                 <button onClick={() => removeItem(idx)}
                   style={{ background: "#fee", color: "#c00", border: "1px solid #fcc", borderRadius: 5, padding: "6px 10px", cursor: "pointer", fontSize: 13, width: mobile ? "100%" : "auto", marginTop: mobile ? 4 : 0 }}>✕</button>
               </div>
+
+              {/* Smart Parser Suggestions */}
+              {item.suggestions && item.suggestions.length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #e0e0e0" }}>
+                  <div style={{ fontSize: 11, color: "#666", marginBottom: 6, fontWeight: 600 }}>💡 Suggestions:</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {item.suggestions.map((suggestion, sidx) => (
+                      <button
+                        key={sidx}
+                        onClick={() => updateItem(idx, "product_name", suggestion.name)}
+                        style={{
+                          background: "#e8f0fe",
+                          color: "#003366",
+                          border: "1px solid #aac4ee",
+                          borderRadius: 6,
+                          padding: "4px 10px",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontWeight: 500,
+                          transition: "all 0.2s"
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = "#d0e0ff";
+                          e.currentTarget.style.borderColor = "#88b0ff";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = "#e8f0fe";
+                          e.currentTarget.style.borderColor = "#aac4ee";
+                        }}
+                      >
+                        {suggestion.name} <span style={{ fontSize: 10, color: "#666", marginLeft: 4 }}>({suggestion.confidence}%)</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
